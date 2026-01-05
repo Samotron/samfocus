@@ -2,6 +2,7 @@
 #define SIDEBAR_H
 
 #include "../core/project.h"
+#include "../core/context.h"
 
 /**
  * Initialize the sidebar.
@@ -15,10 +16,14 @@ void sidebar_init(void);
  * 
  * @param projects Array of projects to display
  * @param project_count Number of projects in the array
- * @param selected_project_id Output: currently selected project ID (0 for Inbox, -1 for none)
- * @param needs_reload Output: set to 1 if projects need to be reloaded from DB
+ * @param contexts Array of contexts to display
+ * @param context_count Number of contexts in the array
+ * @param selected_project_id Output: currently selected project ID
+ * @param selected_context_id Output: currently selected context ID (0 for no filter)
+ * @param needs_reload Output: set to 1 if projects/contexts need to be reloaded from DB
  */
-void sidebar_render(Project* projects, int project_count, int* selected_project_id, int* needs_reload);
+void sidebar_render(Project* projects, int project_count, Context* contexts, int context_count,
+                   int* selected_project_id, int* selected_context_id, int* needs_reload);
 
 /**
  * Cleanup sidebar resources.

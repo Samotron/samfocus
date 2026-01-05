@@ -11,6 +11,7 @@
 #include "core/platform.h"
 #include "core/task.h"
 #include "core/project.h"
+#include "core/context.h"
 #include "db/database.h"
 #include "ui/inbox_view.h"
 #include "ui/sidebar.h"
@@ -26,7 +27,10 @@ static Task* tasks = NULL;
 static int task_count = 0;
 static Project* projects = NULL;
 static int project_count = 0;
+static Context* contexts = NULL;
+static int context_count = 0;
 static int selected_project_id = -1;  // -4 = Flagged, -3 = Anytime, -2 = Completed, -1 = Today, 0 = Inbox, >0 = Project ID
+static int selected_context_id = 0;   // 0 = No filter, >0 = Filter by context
 
 // Load tasks from database (optionally filtered by project)
 static int load_tasks(int project_filter) {
@@ -146,6 +150,22 @@ static int load_projects(void) {
     return 0;
 }
 
+// Load contexts from database
+static int load_contexts(void) {
+    if (contexts != NULL) {
+        free(contexts);
+        contexts = NULL;
+        context_count = 0;
+    }
+    
+    if (db_load_contexts(&contexts, &context_count) != 0) {
+        fprintf(stderr, "Failed to load contexts: %s\n", db_get_error());
+        return -1;
+    }
+    
+    return 0;
+}
+
 int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
@@ -179,8 +199,13 @@ int main(int argc, char** argv) {
     
     printf("Database initialized successfully\n");
     
-    // Load projects and tasks
+    // Load projects, contexts, and tasks
     if (load_projects() != 0) {
+        db_close();
+        return 1;
+    }
+    
+    if (load_contexts() != 0) {
         db_close();
         return 1;
     }
@@ -190,7 +215,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    printf("Loaded %d projects and %d tasks\n", project_count, task_count);
+    printf("Loaded %d projects, %d contexts, and %d tasks\n", project_count, context_count, task_count);
     
     // Setup GLFW
     glfwSetErrorCallback(glfw_error_callback);
@@ -261,10 +286,12 @@ int main(int argc, char** argv) {
         igSetNextWindowSize((ImVec2){sidebar_width, (float)display_h}, ImGuiCond_Always);
         int sidebar_needs_reload = 0;
         int prev_project = selected_project_id;
-        sidebar_render(projects, project_count, &selected_project_id, &sidebar_needs_reload);
+        int prev_context = selected_context_id;
+        sidebar_render(projects, project_count, contexts, context_count, 
+                      &selected_project_id, &selected_context_id, &sidebar_needs_reload);
         
-        // If project changed, reload tasks
-        if (prev_project != selected_project_id) {
+        // If project or context changed, reload tasks
+        if (prev_project != selected_project_id || prev_context != selected_context_id) {
             load_tasks(selected_project_id);
         }
         
@@ -278,6 +305,7 @@ int main(int argc, char** argv) {
         // Reload if needed
         if (sidebar_needs_reload) {
             load_projects();
+            load_contexts();
         }
         if (inbox_needs_reload) {
             load_tasks(selected_project_id);
@@ -311,6 +339,10 @@ int main(int argc, char** argv) {
     
     if (projects != NULL) {
         free(projects);
+    }
+    
+    if (contexts != NULL) {
+        free(contexts);
     }
     
     cleanup_imgui();

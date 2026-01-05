@@ -17,14 +17,25 @@ static int editing_project_id = -1;
 static char edit_project_buffer[INPUT_BUF_SIZE] = {0};
 static bool show_new_project_input = false;
 
+static char new_context_buffer[INPUT_BUF_SIZE] = {0};
+static int editing_context_id = -1;
+static char edit_context_buffer[INPUT_BUF_SIZE] = {0};
+static bool show_new_context_input = false;
+
 void sidebar_init(void) {
     new_project_buffer[0] = '\0';
     editing_project_id = -1;
     edit_project_buffer[0] = '\0';
     show_new_project_input = false;
+    
+    new_context_buffer[0] = '\0';
+    editing_context_id = -1;
+    edit_context_buffer[0] = '\0';
+    show_new_context_input = false;
 }
 
-void sidebar_render(Project* projects, int project_count, int* selected_project_id, int* needs_reload) {
+void sidebar_render(Project* projects, int project_count, Context* contexts, int context_count,
+                   int* selected_project_id, int* selected_context_id, int* needs_reload) {
     *needs_reload = 0;
     
     // Sidebar window (fixed position, set by main.c)
@@ -187,6 +198,86 @@ void sidebar_render(Project* projects, int project_count, int* selected_project_
                 
                 igEndPopup();
             }
+        }
+        
+        igPopID();
+    }
+    
+    igSpacing();
+    igSeparator();
+    igSpacing();
+    
+    // Contexts section
+    igTextColored((ImVec4){0.7f, 0.7f, 0.7f, 1.0f}, "Contexts");
+    igSameLine(0, 10);
+    if (igSmallButton("+##context")) {
+        show_new_context_input = true;
+    }
+    igSpacing();
+    
+    // New context input
+    if (show_new_context_input) {
+        igSetKeyboardFocusHere(0);
+        igPushItemWidth(-1);
+        if (igInputText("##newcontext", new_context_buffer, INPUT_BUF_SIZE, 
+                       ImGuiInputTextFlags_EnterReturnsTrue, NULL, NULL)) {
+            if (new_context_buffer[0] != '\0') {
+                // Use default gray color for now
+                int context_id = db_insert_context(new_context_buffer, "#888888");
+                if (context_id >= 0) {
+                    new_context_buffer[0] = '\0';
+                    show_new_context_input = false;
+                    *needs_reload = 1;
+                } else {
+                    printf("Failed to create context: %s\n", db_get_error());
+                }
+            }
+        }
+        igPopItemWidth();
+        
+        if (igIsKeyPressed_Bool(ImGuiKey_Escape, false)) {
+            show_new_context_input = false;
+            new_context_buffer[0] = '\0';
+        }
+        
+        igSpacing();
+    }
+    
+    // Show "All" option to clear context filter
+    bool no_context_filter = (*selected_context_id == 0);
+    if (igSelectable_Bool("All", no_context_filter, 0, (ImVec2){0, 0})) {
+        *selected_context_id = 0;
+    }
+    
+    // Context list
+    for (int i = 0; i < context_count; i++) {
+        Context* context = &contexts[i];
+        
+        igPushID_Int(1000 + context->id);  // Offset to avoid ID collision with projects
+        
+        bool is_selected = (*selected_context_id == context->id);
+        
+        // Display context name with @ prefix
+        char label[80];
+        snprintf(label, sizeof(label), "@%s", context->name);
+        
+        if (igSelectable_Bool(label, is_selected, 0, (ImVec2){0, 0})) {
+            *selected_context_id = context->id;
+        }
+        
+        // Right-click context menu
+        if (igBeginPopupContextItem(NULL, ImGuiPopupFlags_MouseButtonRight)) {
+            if (igMenuItem_Bool("Delete", NULL, false, true)) {
+                if (db_delete_context(context->id) == 0) {
+                    *needs_reload = 1;
+                    if (*selected_context_id == context->id) {
+                        *selected_context_id = 0;
+                    }
+                }
+                igCloseCurrentPopup();
+            }
+            
+            igEndPopup();
         }
         
         igPopID();
