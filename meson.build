@@ -84,6 +84,7 @@ app_sources = files(
   'src/core/project.c',
   'src/core/context.c',
   'src/core/undo.c',
+  'src/core/export.c',
   'src/db/database.c',
   'src/ui/inbox_view.c',
   'src/ui/sidebar.c',

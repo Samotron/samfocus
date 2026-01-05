@@ -13,6 +13,7 @@
 #include "core/project.h"
 #include "core/context.h"
 #include "core/undo.h"
+#include "core/export.h"
 #include "db/database.h"
 #include "ui/inbox_view.h"
 #include "ui/sidebar.h"
@@ -36,6 +37,7 @@ static int selected_context_id = 0;   // 0 = No filter, >0 = Filter by context
 static CommandPaletteState cmd_palette;
 static bool show_help_overlay = false;
 static UndoStack undo_stack;
+static const char* db_path = NULL;
 
 // Load tasks from database (optionally filtered by project)
 static int load_tasks(int project_filter) {
@@ -199,7 +201,7 @@ int main(int argc, char** argv) {
     }
     
     // Initialize database
-    const char* db_path = path_join(app_dir, "samfocus.db");
+    db_path = path_join(app_dir, "samfocus.db");
     printf("Database path: %s\n", db_path);
     
     if (db_init(db_path) != 0) {
@@ -390,9 +392,47 @@ int main(int argc, char** argv) {
                         break;
                     }
                 }
+            } else if (selected->type == CMD_TYPE_ACTION) {
+                // Handle actions
+                if (selected->action == CMD_ACTION_EXPORT_TEXT ||
+                    selected->action == CMD_ACTION_EXPORT_MARKDOWN ||
+                    selected->action == CMD_ACTION_EXPORT_CSV) {
+                    // Generate timestamped filename
+                    time_t now = time(NULL);
+                    struct tm* tm_info = localtime(&now);
+                    char timestamp[32];
+                    strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", tm_info);
+                    
+                    const char* ext = "txt";
+                    ExportFormat format = EXPORT_FORMAT_TEXT;
+                    
+                    if (selected->action == CMD_ACTION_EXPORT_MARKDOWN) {
+                        ext = "md";
+                        format = EXPORT_FORMAT_MARKDOWN;
+                    } else if (selected->action == CMD_ACTION_EXPORT_CSV) {
+                        ext = "csv";
+                        format = EXPORT_FORMAT_CSV;
+                    }
+                    
+                    char filepath[512];
+                    snprintf(filepath, sizeof(filepath), "%s/tasks_%s.%s",
+                            export_get_default_dir(), timestamp, ext);
+                    
+                    if (export_tasks(filepath, format, tasks, task_count, projects, project_count) == 0) {
+                        printf("Exported to: %s\n", filepath);
+                    } else {
+                        fprintf(stderr, "Export failed: %s\n", export_get_error());
+                    }
+                } else if (selected->action == CMD_ACTION_BACKUP_DB) {
+                    if (export_create_backup(db_path) == 0) {
+                        printf("Database backup created successfully\n");
+                    } else {
+                        fprintf(stderr, "Backup failed: %s\n", export_get_error());
+                    }
+                }
             }
             // Actions would require getting the current selected task ID from inbox_view
-            // For now, actions in command palette are documented but not fully implemented
+            // For now, task-specific actions in command palette are not fully implemented
         }
         
         // Render help overlay if toggled

@@ -68,10 +68,14 @@ static void populate_results(CommandPaletteState* state,
             {CMD_ACTION_DUE_TODAY, "/due today - Set due date to today"},
             {CMD_ACTION_DUE_TOMORROW, "/due tomorrow - Set due date to tomorrow"},
             {CMD_ACTION_COMPLETE, "/complete - Mark selected task as complete"},
-            {CMD_ACTION_DELETE, "/delete - Delete selected task"}
+            {CMD_ACTION_DELETE, "/delete - Delete selected task"},
+            {CMD_ACTION_EXPORT_TEXT, "/export text - Export all tasks to text file"},
+            {CMD_ACTION_EXPORT_MARKDOWN, "/export markdown - Export all tasks to markdown"},
+            {CMD_ACTION_EXPORT_CSV, "/export csv - Export all tasks to CSV file"},
+            {CMD_ACTION_BACKUP_DB, "/backup - Create database backup"}
         };
         
-        for (int i = 0; i < 8 && state->result_count < 50; i++) {
+        for (int i = 0; i < 13 && state->result_count < 50; i++) {
             if (fuzzy_match(state->search_input, actions[i].text)) {
                 CommandResult* r = &state->results[state->result_count++];
                 r->type = CMD_TYPE_ACTION;
