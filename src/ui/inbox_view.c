@@ -327,12 +327,48 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                     char defer_btn[32];
                     snprintf(defer_btn, sizeof(defer_btn), "Defer##defer_%d", task->id);
                     if (igSmallButton(defer_btn)) {
-                        // Set defer to tomorrow (simple default)
+                        char popup_id[48];
+                        snprintf(popup_id, sizeof(popup_id), "defer_popup_%d", task->id);
+                        igOpenPopup_Str(popup_id, 0);
+                    }
+                    
+                    // Defer date picker popup
+                    char popup_id[48];
+                    snprintf(popup_id, sizeof(popup_id), "defer_popup_%d", task->id);
+                    if (igBeginPopup(popup_id, 0)) {
                         time_t now = time(NULL);
-                        time_t tomorrow = now + (24 * 60 * 60);
-                        if (db_update_task_defer_at(task->id, tomorrow) == 0) {
-                            *needs_reload = 1;
+                        struct tm* now_tm = localtime(&now);
+                        
+                        // Today (end of day)
+                        if (igSelectable_Bool("Today", false, 0, (ImVec2){0, 0})) {
+                            struct tm eod = *now_tm;
+                            eod.tm_hour = 23; eod.tm_min = 59; eod.tm_sec = 59;
+                            time_t eod_time = mktime(&eod);
+                            if (db_update_task_defer_at(task->id, eod_time) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
                         }
+                        
+                        // Tomorrow
+                        if (igSelectable_Bool("Tomorrow", false, 0, (ImVec2){0, 0})) {
+                            time_t tomorrow = now + (24 * 60 * 60);
+                            if (db_update_task_defer_at(task->id, tomorrow) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        // Next Week
+                        if (igSelectable_Bool("Next Week", false, 0, (ImVec2){0, 0})) {
+                            time_t next_week = now + (7 * 24 * 60 * 60);
+                            if (db_update_task_defer_at(task->id, next_week) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        igEndPopup();
                     }
                 }
                 
@@ -380,12 +416,60 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                     char due_btn[32];
                     snprintf(due_btn, sizeof(due_btn), "Due##due_%d", task->id);
                     if (igSmallButton(due_btn)) {
-                        // Set due to tomorrow (simple default)
+                        char popup_id[48];
+                        snprintf(popup_id, sizeof(popup_id), "due_popup_%d", task->id);
+                        igOpenPopup_Str(popup_id, 0);
+                    }
+                    
+                    // Due date picker popup
+                    char due_popup_id[48];
+                    snprintf(due_popup_id, sizeof(due_popup_id), "due_popup_%d", task->id);
+                    if (igBeginPopup(due_popup_id, 0)) {
                         time_t now = time(NULL);
-                        time_t tomorrow = now + (24 * 60 * 60);
-                        if (db_update_task_due_at(task->id, tomorrow) == 0) {
-                            *needs_reload = 1;
+                        struct tm* now_tm = localtime(&now);
+                        
+                        // Today (end of day)
+                        if (igSelectable_Bool("Today", false, 0, (ImVec2){0, 0})) {
+                            struct tm eod = *now_tm;
+                            eod.tm_hour = 23; eod.tm_min = 59; eod.tm_sec = 59;
+                            time_t eod_time = mktime(&eod);
+                            if (db_update_task_due_at(task->id, eod_time) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
                         }
+                        
+                        // Tomorrow
+                        if (igSelectable_Bool("Tomorrow", false, 0, (ImVec2){0, 0})) {
+                            time_t tomorrow = now + (24 * 60 * 60);
+                            if (db_update_task_due_at(task->id, tomorrow) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        // This Weekend (Saturday)
+                        if (igSelectable_Bool("This Weekend", false, 0, (ImVec2){0, 0})) {
+                            // Calculate days until Saturday
+                            int days_until_saturday = (6 - now_tm->tm_wday + 7) % 7;
+                            if (days_until_saturday == 0) days_until_saturday = 7; // If today is Saturday, go to next Saturday
+                            time_t saturday = now + (days_until_saturday * 24 * 60 * 60);
+                            if (db_update_task_due_at(task->id, saturday) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        // Next Week
+                        if (igSelectable_Bool("Next Week", false, 0, (ImVec2){0, 0})) {
+                            time_t next_week = now + (7 * 24 * 60 * 60);
+                            if (db_update_task_due_at(task->id, next_week) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        igEndPopup();
                     }
                 }
             }
