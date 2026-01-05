@@ -67,6 +67,21 @@ int db_create_schema(void) {
         "    title TEXT NOT NULL,"
         "    type INTEGER NOT NULL DEFAULT 0,"
         "    created_at INTEGER NOT NULL"
+        ");"
+        ""
+        "CREATE TABLE IF NOT EXISTS contexts ("
+        "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "    name TEXT NOT NULL UNIQUE,"
+        "    color TEXT DEFAULT '#888888',"
+        "    created_at INTEGER NOT NULL"
+        ");"
+        ""
+        "CREATE TABLE IF NOT EXISTS task_contexts ("
+        "    task_id INTEGER NOT NULL,"
+        "    context_id INTEGER NOT NULL,"
+        "    PRIMARY KEY (task_id, context_id),"
+        "    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,"
+        "    FOREIGN KEY (context_id) REFERENCES contexts(id) ON DELETE CASCADE"
         ");";
     
     char* err = NULL;
@@ -783,4 +798,297 @@ int db_get_first_incomplete_task_in_project(int project_id) {
     
     sqlite3_finalize(stmt);
     return task_id;
+}
+
+// ============================================================================
+// Context operations
+// ============================================================================
+
+int db_insert_context(const char* name, const char* color) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    if (name == NULL || name[0] == '\0') {
+        set_error("Context name cannot be empty");
+        return -1;
+    }
+    
+    const char* sql = "INSERT INTO contexts (name, color, created_at) VALUES (?, ?, ?);";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_text(stmt, 1, name, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, color ? color : "#888888", -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(stmt, 3, (sqlite3_int64)time(NULL));
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to insert context: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return (int)sqlite3_last_insert_rowid(db);
+}
+
+int db_load_contexts(Context** contexts, int* count) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    if (contexts == NULL || count == NULL) {
+        set_error("Invalid parameters");
+        return -1;
+    }
+    
+    *contexts = NULL;
+    *count = 0;
+    
+    const char* sql = "SELECT id, name, color, created_at FROM contexts ORDER BY name ASC;";
+    
+    sqlite3_stmt* stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    int capacity = 8;
+    *contexts = (Context*)malloc(sizeof(Context) * capacity);
+    if (*contexts == NULL) {
+        set_error("Out of memory");
+        sqlite3_finalize(stmt);
+        return -1;
+    }
+    
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        if (*count >= capacity) {
+            capacity *= 2;
+            Context* new_contexts = (Context*)realloc(*contexts, sizeof(Context) * capacity);
+            if (new_contexts == NULL) {
+                set_error("Out of memory");
+                free(*contexts);
+                *contexts = NULL;
+                *count = 0;
+                sqlite3_finalize(stmt);
+                return -1;
+            }
+            *contexts = new_contexts;
+        }
+        
+        Context* context = &(*contexts)[*count];
+        context->id = sqlite3_column_int(stmt, 0);
+        
+        const char* name = (const char*)sqlite3_column_text(stmt, 1);
+        strncpy(context->name, name ? name : "", sizeof(context->name) - 1);
+        context->name[sizeof(context->name) - 1] = '\0';
+        
+        const char* color = (const char*)sqlite3_column_text(stmt, 2);
+        strncpy(context->color, color ? color : "#888888", sizeof(context->color) - 1);
+        context->color[sizeof(context->color) - 1] = '\0';
+        
+        context->created_at = (time_t)sqlite3_column_int64(stmt, 3);
+        
+        (*count)++;
+    }
+    
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Error reading contexts: %s", sqlite3_errmsg(db));
+        free(*contexts);
+        *contexts = NULL;
+        *count = 0;
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_delete_context(int id) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    const char* sql = "DELETE FROM contexts WHERE id = ?;";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, id);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to delete context: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_add_context_to_task(int task_id, int context_id) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    const char* sql = "INSERT OR IGNORE INTO task_contexts (task_id, context_id) VALUES (?, ?);";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, task_id);
+    sqlite3_bind_int(stmt, 2, context_id);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to add context to task: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_remove_context_from_task(int task_id, int context_id) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    const char* sql = "DELETE FROM task_contexts WHERE task_id = ? AND context_id = ?;";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, task_id);
+    sqlite3_bind_int(stmt, 2, context_id);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to remove context from task: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_get_task_contexts(int task_id, Context** contexts, int* count) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    if (contexts == NULL || count == NULL) {
+        set_error("Invalid parameters");
+        return -1;
+    }
+    
+    *contexts = NULL;
+    *count = 0;
+    
+    const char* sql = "SELECT c.id, c.name, c.color, c.created_at "
+                     "FROM contexts c "
+                     "JOIN task_contexts tc ON c.id = tc.context_id "
+                     "WHERE tc.task_id = ? "
+                     "ORDER BY c.name ASC;";
+    
+    sqlite3_stmt* stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, task_id);
+    
+    int capacity = 4;
+    *contexts = (Context*)malloc(sizeof(Context) * capacity);
+    if (*contexts == NULL) {
+        set_error("Out of memory");
+        sqlite3_finalize(stmt);
+        return -1;
+    }
+    
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        if (*count >= capacity) {
+            capacity *= 2;
+            Context* new_contexts = (Context*)realloc(*contexts, sizeof(Context) * capacity);
+            if (new_contexts == NULL) {
+                set_error("Out of memory");
+                free(*contexts);
+                *contexts = NULL;
+                *count = 0;
+                sqlite3_finalize(stmt);
+                return -1;
+            }
+            *contexts = new_contexts;
+        }
+        
+        Context* context = &(*contexts)[*count];
+        context->id = sqlite3_column_int(stmt, 0);
+        
+        const char* name = (const char*)sqlite3_column_text(stmt, 1);
+        strncpy(context->name, name ? name : "", sizeof(context->name) - 1);
+        context->name[sizeof(context->name) - 1] = '\0';
+        
+        const char* color = (const char*)sqlite3_column_text(stmt, 2);
+        strncpy(context->color, color ? color : "#888888", sizeof(context->color) - 1);
+        context->color[sizeof(context->color) - 1] = '\0';
+        
+        context->created_at = (time_t)sqlite3_column_int64(stmt, 3);
+        
+        (*count)++;
+    }
+    
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Error reading task contexts: %s", sqlite3_errmsg(db));
+        free(*contexts);
+        *contexts = NULL;
+        *count = 0;
+        return -1;
+    }
+    
+    return 0;
 }

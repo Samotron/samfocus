@@ -3,6 +3,7 @@
 
 #include "../core/task.h"
 #include "../core/project.h"
+#include "../core/context.h"
 
 /**
  * Initialize the database connection.
@@ -172,5 +173,59 @@ int db_assign_task_to_project(int task_id, int project_id);
  * Returns task ID on success, -1 if no incomplete tasks, -2 on error.
  */
 int db_get_first_incomplete_task_in_project(int project_id);
+
+// ============================================================================
+// Context operations
+// ============================================================================
+
+/**
+ * Insert a new context.
+ * 
+ * Returns the new context ID on success, -1 on error.
+ */
+int db_insert_context(const char* name, const char* color);
+
+/**
+ * Load all contexts.
+ * 
+ * @param contexts Output pointer to array of contexts (caller must free)
+ * @param count Output pointer to number of contexts loaded
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_load_contexts(Context** contexts, int* count);
+
+/**
+ * Delete a context by ID.
+ * Note: This will also remove the context from all tasks.
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_delete_context(int id);
+
+/**
+ * Add a context to a task.
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_add_context_to_task(int task_id, int context_id);
+
+/**
+ * Remove a context from a task.
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_remove_context_from_task(int task_id, int context_id);
+
+/**
+ * Get all contexts for a task.
+ * 
+ * @param task_id Task ID
+ * @param contexts Output pointer to array of contexts (caller must free)
+ * @param count Output pointer to number of contexts
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_get_task_contexts(int task_id, Context** contexts, int* count);
 
 #endif // DATABASE_H
