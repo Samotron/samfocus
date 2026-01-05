@@ -20,7 +20,10 @@ typedef enum {
     ACTION_SEARCH_TASK,
     ACTION_QUICK_COMMAND,
     ACTION_OPEN_PROJECT,
-    ACTION_FILTER_CONTEXT
+    ACTION_FILTER_CONTEXT,
+    ACTION_CALCULATOR,
+    ACTION_CLIPBOARD,
+    ACTION_SYSTEM_COMMAND
 } ActionType;
 
 typedef struct {
@@ -152,6 +155,59 @@ static void extract_task_components(const char* input, char* task_title,
     }
 }
 
+// Simple calculator for basic math expressions
+static int evaluate_expression(const char* expr, double* result) {
+    // Very basic calculator - handles +, -, *, /, parentheses
+    // For production, would use a proper expression parser
+    
+    // Check if it looks like a math expression
+    bool has_operator = false;
+    bool has_digit = false;
+    
+    for (const char* p = expr; *p; p++) {
+        if (isdigit(*p) || *p == '.') has_digit = true;
+        if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')') has_operator = true;
+    }
+    
+    if (!has_digit || !has_operator) return -1;
+    
+    // Use sscanf for simple two-operand expressions
+    double a, b;
+    char op;
+    
+    // Try format: number operator number
+    if (sscanf(expr, "%lf %c %lf", &a, &op, &b) == 3) {
+        switch (op) {
+            case '+': *result = a + b; return 0;
+            case '-': *result = a - b; return 0;
+            case '*': *result = a * b; return 0;
+            case '/': 
+                if (b != 0) {
+                    *result = a / b;
+                    return 0;
+                }
+                return -1;
+        }
+    }
+    
+    // Try without space
+    if (sscanf(expr, "%lf%c%lf", &a, &op, &b) == 3) {
+        switch (op) {
+            case '+': *result = a + b; return 0;
+            case '-': *result = a - b; return 0;
+            case '*': *result = a * b; return 0;
+            case '/': 
+                if (b != 0) {
+                    *result = a / b;
+                    return 0;
+                }
+                return -1;
+        }
+    }
+    
+    return -1;
+}
+
 static void fuzzy_search_tasks(const char* query, Task* tasks, int task_count) {
     result_count = 0;
     
@@ -194,6 +250,18 @@ static void generate_actions(const char* input, Task* tasks, int task_count,
                 "Type to add a new task");
         result_count++;
         return;
+    }
+    
+    // Check for calculator expression first
+    double calc_result;
+    if (evaluate_expression(input, &calc_result) == 0) {
+        results[result_count].type = ACTION_CALCULATOR;
+        snprintf(results[result_count].label, sizeof(results[result_count].label),
+                "= %.6g", calc_result);
+        snprintf(results[result_count].description, sizeof(results[result_count].description),
+                "Copy result to clipboard");
+        result_count++;
+        // Don't return - also show task creation option
     }
     
     // Check for command prefixes
@@ -319,7 +387,11 @@ void launcher_render(Task* tasks, int task_count,
         if (igIsKeyPressed_Bool(ImGuiKey_Enter, false) && result_count > 0) {
             LauncherAction* action = &results[selected_index];
             
-            if (action->type == ACTION_ADD_TASK) {
+            if (action->type == ACTION_CALCULATOR) {
+                // Copy calculator result to clipboard
+                igSetClipboardText(action->label + 2);  // Skip "= " prefix
+                printf("Calculator result copied to clipboard: %s\n", action->label);
+            } else if (action->type == ACTION_ADD_TASK) {
                 // Parse input and create task
                 char task_title[INPUT_BUF_SIZE] = {0};
                 time_t due_date = 0;
@@ -380,6 +452,9 @@ void launcher_render(Task* tasks, int task_count,
                 else if (results[i].type == ACTION_OPEN_PROJECT) icon = "📁";
                 else if (results[i].type == ACTION_FILTER_CONTEXT) icon = "🏷️";
                 else if (results[i].type == ACTION_QUICK_COMMAND) icon = "⚡";
+                else if (results[i].type == ACTION_CALCULATOR) icon = "🔢";
+                else if (results[i].type == ACTION_CLIPBOARD) icon = "📋";
+                else if (results[i].type == ACTION_SYSTEM_COMMAND) icon = "⚙️";
                 
                 igText("%s", icon);
                 igSameLine(0, 10);

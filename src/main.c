@@ -14,6 +14,7 @@
 #include "core/context.h"
 #include "core/undo.h"
 #include "core/export.h"
+#include "core/preferences.h"
 #include "db/database.h"
 #include "ui/inbox_view.h"
 #include "ui/sidebar.h"
@@ -37,6 +38,8 @@ static int selected_project_id = -1;  // -4 = Flagged, -3 = Anytime, -2 = Comple
 static int selected_context_id = 0;   // 0 = No filter, >0 = Filter by context
 static CommandPaletteState cmd_palette;
 static bool show_help_overlay = false;
+static bool show_preferences = false;
+static Preferences preferences;
 static UndoStack undo_stack;
 static const char* db_path = NULL;
 
@@ -281,6 +284,8 @@ int main(int argc, char** argv) {
     command_palette_init(&cmd_palette);
     undo_init(&undo_stack);
     launcher_init();
+    preferences_init(&preferences);
+    preferences_load(&preferences);
     
     printf("Entering main loop...\n");
     
@@ -315,13 +320,18 @@ int main(int argc, char** argv) {
             igOpenPopup_Str("Command Palette", ImGuiPopupFlags_None);
         }
         
-        // Ctrl+Space to toggle launcher
-        if (io->KeyCtrl && igIsKeyPressed_Bool(ImGuiKey_Space, false)) {
+        // Customizable hotkey to toggle launcher
+        if (preferences_hotkey_pressed(&preferences.launcher_hotkey)) {
             if (launcher_is_visible()) {
                 launcher_hide();
             } else {
                 launcher_show();
             }
+        }
+        
+        // Ctrl+, to open preferences
+        if (io->KeyCtrl && igIsKeyPressed_Bool(ImGuiKey_Comma, false)) {
+            show_preferences = !show_preferences;
         }
         
         // Ctrl+1-5 for perspective switching
@@ -453,6 +463,9 @@ int main(int argc, char** argv) {
         if (launcher_needs_reload) {
             load_tasks(selected_project_id);
         }
+        
+        // Render preferences window
+        preferences_render(&preferences, &show_preferences);
         
         // Render help overlay if toggled
         help_overlay_render(show_help_overlay);
