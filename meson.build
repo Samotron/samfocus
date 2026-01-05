@@ -126,3 +126,37 @@ executable('samfocus-cli',
   c_args: platform_args,
   install: true
 )
+
+# ============================================================================
+# Tests
+# ============================================================================
+
+# Shared database test sources (used by both unit and integration tests)
+test_db_sources = files(
+  'src/db/database.c',
+  'src/core/task.c',
+  'src/core/project.c',
+  'src/core/context.c',
+)
+
+# Unit tests
+test_database = executable('test_database',
+  'tests/unit/test_database.c',
+  test_db_sources,
+  include_directories: [src_inc, include_directories('tests')],
+  dependencies: [sqlite_dep],
+  c_args: platform_args,
+)
+
+# Integration tests
+test_workflows = executable('test_workflows',
+  'tests/integration/test_workflows.c',
+  test_db_sources,
+  include_directories: [src_inc, include_directories('tests')],
+  dependencies: [sqlite_dep],
+  c_args: platform_args,
+)
+
+# Register tests with meson test runner
+test('Database Unit Tests', test_database)
+test('Integration Workflow Tests', test_workflows)

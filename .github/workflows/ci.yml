@@ -1,0 +1,112 @@
+name: CI Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-linux:
+    name: Test on Linux
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          meson \
+          ninja-build \
+          libglfw3-dev \
+          libgl1-mesa-dev \
+          libsqlite3-dev \
+          libx11-dev \
+          pkg-config
+    
+    - name: Setup build
+      run: meson setup build
+    
+    - name: Compile
+      run: meson compile -C build
+    
+    - name: Run tests
+      run: meson test -C build -v
+    
+    - name: Upload test logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-logs-linux
+        path: build/meson-logs/testlog.txt
+
+  build-windows:
+    name: Build on Windows
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-meson
+          mingw-w64-x86_64-ninja
+          mingw-w64-x86_64-glfw
+          mingw-w64-x86_64-sqlite3
+          mingw-w64-x86_64-pkg-config
+    
+    - name: Build
+      shell: msys2 {0}
+      run: |
+        meson setup build
+        meson compile -C build
+    
+    - name: Run tests
+      shell: msys2 {0}
+      run: meson test -C build -v
+    
+    - name: Upload test logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-logs-windows
+        path: build/meson-logs/testlog.txt
+
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cppcheck
+    
+    - name: Run cppcheck
+      run: |
+        cppcheck --enable=warning,style,performance,portability \
+          --suppress=missingIncludeSystem \
+          --error-exitcode=0 \
+          src/ 2>&1 | tee cppcheck.txt
+    
+    - name: Upload cppcheck results
+      uses: actions/upload-artifact@v3
+      with:
+        name: cppcheck-results
+        path: cppcheck.txt
