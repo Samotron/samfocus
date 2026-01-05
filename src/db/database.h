@@ -85,6 +85,16 @@ int db_update_task_defer_at(int id, time_t defer_at);
 int db_update_task_due_at(int id, time_t due_at);
 
 /**
+ * Update a task's flagged status.
+ * 
+ * @param id Task ID
+ * @param flagged 0 = not flagged, 1 = flagged
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_update_task_flagged(int id, int flagged);
+
+/**
  * Delete a task by ID.
  * 
  * Returns 0 on success, -1 on error.

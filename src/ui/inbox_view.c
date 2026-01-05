@@ -207,6 +207,22 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                 }
             }
             
+            igSameLine(0, 5);
+            
+            // Star/flag button
+            const char* star_label = task->flagged ? "★" : "☆";
+            ImVec4 star_color = task->flagged ? 
+                (ImVec4){1.0f, 0.8f, 0.0f, 1.0f} :  // Gold when flagged
+                (ImVec4){0.5f, 0.5f, 0.5f, 1.0f};   // Gray when not flagged
+            
+            igPushStyleColor_Vec4(ImGuiCol_Text, star_color);
+            if (igSmallButton(star_label)) {
+                if (db_update_task_flagged(task->id, !task->flagged) == 0) {
+                    *needs_reload = 1;
+                }
+            }
+            igPopStyleColor(1);
+            
             igSameLine(0, 10);
             
             // Task title (editable if this task is being edited)

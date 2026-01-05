@@ -20,6 +20,7 @@ typedef struct {
     time_t created_at;
     time_t defer_at;  // 0 if not deferred (task available immediately)
     time_t due_at;    // 0 if no due date
+    int flagged;      // 0 = not flagged, 1 = flagged/starred
 } Task;
 
 #endif // TASK_H

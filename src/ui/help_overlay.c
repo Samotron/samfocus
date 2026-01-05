@@ -53,12 +53,14 @@ void help_overlay_render(bool show_help) {
         igBulletText("Ctrl+Enter - Toggle completion status");
         igBulletText("Delete - Remove selected task");
         igBulletText("Escape - Cancel edit mode");
+        igBulletText("Star (☆/★) button - Flag/unflag task");
         igSpacing();
         
         // Projects section
         igTextColored((ImVec4){1.0f, 0.8f, 0.2f, 1.0f}, "Perspectives & Projects:");
         igBulletText("'Today' - Tasks due today/overdue + available tasks");
         igBulletText("'Anytime' - All available tasks (not deferred)");
+        igBulletText("'Flagged' - Starred/important tasks");
         igBulletText("'Inbox' - Unassigned tasks");
         igBulletText("'Completed' - Finished tasks");
         igBulletText("Click project - View project tasks");
