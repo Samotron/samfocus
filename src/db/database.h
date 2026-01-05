@@ -253,4 +253,48 @@ int db_update_task_recurrence(int id, RecurrencePattern pattern, int interval);
  */
 int db_create_recurring_instance(Task* template_task);
 
+// ============================================================================
+// Task dependency operations
+// ============================================================================
+
+/**
+ * Add a dependency relationship between tasks.
+ * 
+ * @param task_id The task that depends on another task
+ * @param depends_on_task_id The task that must be completed first
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_add_dependency(int task_id, int depends_on_task_id);
+
+/**
+ * Remove a dependency relationship between tasks.
+ * 
+ * @param task_id The task that depends on another task
+ * @param depends_on_task_id The task dependency to remove
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_remove_dependency(int task_id, int depends_on_task_id);
+
+/**
+ * Get all tasks that a given task depends on.
+ * 
+ * @param task_id Task ID
+ * @param dependency_ids Output pointer to array of task IDs (caller must free)
+ * @param count Output pointer to number of dependencies
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_get_task_dependencies(int task_id, int** dependency_ids, int* count);
+
+/**
+ * Check if a task has incomplete dependencies (is blocked).
+ * 
+ * @param task_id Task ID
+ * 
+ * Returns 1 if task is blocked, 0 if not blocked, -1 on error.
+ */
+int db_is_task_blocked(int task_id);
+
 #endif // DATABASE_H

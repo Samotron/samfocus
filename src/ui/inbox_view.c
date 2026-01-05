@@ -102,6 +102,10 @@ static bool batch_mode = false;
 static bool selected_tasks[1000] = {0};  // Track selected task IDs
 static int selected_count = 0;
 
+// Dependency management state
+static int editing_dependencies_task_id = -1;
+static char dependency_input[INPUT_BUF_SIZE] = {0};
+
 void inbox_view_init(void) {
     input_buffer[0] = '\0';
     selected_task_index = -1;
@@ -507,10 +511,25 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                 }
             } else {
                 // Display mode
+                
+                // Check if task is blocked by dependencies
+                int is_blocked = db_is_task_blocked(task->id);
+                
                 if (is_done) {
                     igTextDisabled("%s", task->title);
                 } else {
                     igText("%s", task->title);
+                }
+                
+                // Show blocked indicator if task has incomplete dependencies
+                if (is_blocked && !is_done) {
+                    igSameLine(0, 5);
+                    igPushStyleColor_Vec4(ImGuiCol_Text, (ImVec4){1.0f, 0.6f, 0.2f, 1.0f});
+                    igText("⏳");
+                    igPopStyleColor(1);
+                    if (igIsItemHovered(0)) {
+                        igSetTooltip("Waiting on dependencies");
+                    }
                 }
                 
                 // Click to select and edit
@@ -1052,6 +1071,126 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                     }
                     igSameLine(0, 10);
                     if (igButton("Cancel", (ImVec2){0, 0})) {
+                        igCloseCurrentPopup();
+                    }
+                    
+                    igEndPopup();
+                }
+            }
+            
+            // Dependencies button/indicator
+            if (editing_task_id != task->id) {
+                igSameLine(0, 10);
+                
+                // Check if task has dependencies
+                int* dep_ids = NULL;
+                int dep_count = 0;
+                db_get_task_dependencies(task->id, &dep_ids, &dep_count);
+                
+                char deps_btn[32];
+                snprintf(deps_btn, sizeof(deps_btn), "%s##deps_%d", 
+                        dep_count > 0 ? "Deps*" : "Deps", task->id);
+                
+                // Check if task is blocked
+                int is_blocked = db_is_task_blocked(task->id);
+                
+                if (dep_count > 0 || is_blocked) {
+                    ImVec4 btn_color = is_blocked ? 
+                        (ImVec4){0.6f, 0.3f, 0.2f, 1.0f} :  // Red if blocked
+                        (ImVec4){0.3f, 0.5f, 0.4f, 1.0f};   // Green if has deps but not blocked
+                    igPushStyleColor_Vec4(ImGuiCol_Button, btn_color);
+                }
+                
+                if (igSmallButton(deps_btn)) {
+                    editing_dependencies_task_id = task->id;
+                    dependency_input[0] = '\0';
+                    char popup_id[48];
+                    snprintf(popup_id, sizeof(popup_id), "deps_popup_%d", task->id);
+                    igOpenPopup_Str(popup_id, 0);
+                }
+                
+                if (dep_count > 0 || is_blocked) {
+                    igPopStyleColor(1);
+                }
+                
+                if (dep_ids) {
+                    free(dep_ids);
+                }
+                
+                // Dependencies popup
+                char deps_popup_id[48];
+                snprintf(deps_popup_id, sizeof(deps_popup_id), "deps_popup_%d", task->id);
+                if (igBeginPopup(deps_popup_id, 0)) {
+                    igText("Dependencies for: %s", task->title);
+                    igSeparator();
+                    igSpacing();
+                    
+                    // Load and display dependencies
+                    int* dependency_ids = NULL;
+                    int dependency_count = 0;
+                    if (db_get_task_dependencies(task->id, &dependency_ids, &dependency_count) == 0) {
+                        if (dependency_count > 0) {
+                            igText("This task depends on:");
+                            igSpacing();
+                            
+                            for (int d = 0; d < dependency_count; d++) {
+                                int dep_id = dependency_ids[d];
+                                
+                                // Find the dependency task
+                                Task* dep_task = NULL;
+                                for (int t = 0; t < task_count; t++) {
+                                    if (tasks[t].id == dep_id) {
+                                        dep_task = &tasks[t];
+                                        break;
+                                    }
+                                }
+                                
+                                if (dep_task) {
+                                    // Show status icon
+                                    const char* status_icon = (dep_task->status == TASK_STATUS_DONE) ? "✓" : "○";
+                                    igText("  %s Task #%d: %s", status_icon, dep_id, dep_task->title);
+                                    igSameLine(0, 10);
+                                    
+                                    char remove_btn[32];
+                                    snprintf(remove_btn, sizeof(remove_btn), "Remove##%d", dep_id);
+                                    if (igSmallButton(remove_btn)) {
+                                        db_remove_dependency(task->id, dep_id);
+                                        *needs_reload = 1;
+                                    }
+                                } else {
+                                    igText("  Task #%d (not found)", dep_id);
+                                }
+                            }
+                            igSpacing();
+                            igSeparator();
+                            igSpacing();
+                        } else {
+                            igTextDisabled("No dependencies set");
+                            igSpacing();
+                        }
+                        
+                        if (dependency_ids) {
+                            free(dependency_ids);
+                        }
+                    }
+                    
+                    // Add new dependency
+                    igText("Add dependency (task ID):");
+                    igPushItemWidth(200);
+                    if (igInputTextWithHint("##dep_input", "Task ID...", dependency_input, 
+                                           INPUT_BUF_SIZE, ImGuiInputTextFlags_EnterReturnsTrue, NULL, NULL)) {
+                        int dep_id = atoi(dependency_input);
+                        if (dep_id > 0 && dep_id != task->id) {
+                            if (db_add_dependency(task->id, dep_id) == 0) {
+                                *needs_reload = 1;
+                                dependency_input[0] = '\0';
+                            }
+                        }
+                    }
+                    igPopItemWidth();
+                    
+                    igSpacing();
+                    if (igButton("Close", (ImVec2){0, 0})) {
                         igCloseCurrentPopup();
                     }
                     

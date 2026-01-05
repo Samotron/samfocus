@@ -84,6 +84,14 @@ int db_create_schema(void) {
         "    PRIMARY KEY (task_id, context_id),"
         "    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,"
         "    FOREIGN KEY (context_id) REFERENCES contexts(id) ON DELETE CASCADE"
+        ");"
+        ""
+        "CREATE TABLE IF NOT EXISTS task_dependencies ("
+        "    task_id INTEGER NOT NULL,"
+        "    depends_on_task_id INTEGER NOT NULL,"
+        "    PRIMARY KEY (task_id, depends_on_task_id),"
+        "    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,"
+        "    FOREIGN KEY (depends_on_task_id) REFERENCES tasks(id) ON DELETE CASCADE"
         ");";
     
     char* err = NULL;
@@ -1268,4 +1276,161 @@ int db_create_recurring_instance(Task* template_task) {
     }
     
     return new_task_id;
+}
+
+// ============================================================================
+// Task dependency operations
+// ============================================================================
+
+int db_add_dependency(int task_id, int depends_on_task_id) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    // Prevent self-dependency
+    if (task_id == depends_on_task_id) {
+        set_error("Task cannot depend on itself");
+        return -1;
+    }
+    
+    const char* sql = "INSERT OR IGNORE INTO task_dependencies (task_id, depends_on_task_id) VALUES (?, ?);";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, task_id);
+    sqlite3_bind_int(stmt, 2, depends_on_task_id);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to add dependency: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_remove_dependency(int task_id, int depends_on_task_id) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    const char* sql = "DELETE FROM task_dependencies WHERE task_id = ? AND depends_on_task_id = ?;";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, task_id);
+    sqlite3_bind_int(stmt, 2, depends_on_task_id);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to remove dependency: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_get_task_dependencies(int task_id, int** dependency_ids, int* count) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    const char* sql = "SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ?;";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, task_id);
+    
+    // First pass: count results
+    int result_count = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        result_count++;
+    }
+    sqlite3_reset(stmt);
+    
+    *count = result_count;
+    
+    if (result_count == 0) {
+        *dependency_ids = NULL;
+        sqlite3_finalize(stmt);
+        return 0;
+    }
+    
+    // Allocate array
+    *dependency_ids = (int*)malloc(result_count * sizeof(int));
+    if (*dependency_ids == NULL) {
+        sqlite3_finalize(stmt);
+        set_error("Memory allocation failed");
+        return -1;
+    }
+    
+    // Second pass: populate array
+    int i = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        (*dependency_ids)[i++] = sqlite3_column_int(stmt, 0);
+    }
+    
+    sqlite3_finalize(stmt);
+    return 0;
+}
+
+int db_is_task_blocked(int task_id) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    // Check if any dependencies are not completed
+    const char* sql = 
+        "SELECT COUNT(*) FROM task_dependencies d "
+        "JOIN tasks t ON d.depends_on_task_id = t.id "
+        "WHERE d.task_id = ? AND t.status != ?;";
+    
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, task_id);
+    sqlite3_bind_int(stmt, 2, TASK_STATUS_DONE);
+    
+    int blocked = 0;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        int incomplete_count = sqlite3_column_int(stmt, 0);
+        blocked = (incomplete_count > 0) ? 1 : 0;
+    }
+    
+    sqlite3_finalize(stmt);
+    return blocked;
 }
