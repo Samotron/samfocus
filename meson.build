@@ -39,6 +39,7 @@ platform_deps = []
 if is_linux
   platform_deps += dependency('dl', required: false)
   platform_deps += dependency('threads', required: true)
+  platform_deps += dependency('x11', required: true)
 elif is_windows
   # Windows needs these for SHGetFolderPath and file operations
   platform_deps += meson.get_compiler('c').find_library('shell32', required: true)

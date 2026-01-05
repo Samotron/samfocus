@@ -2,10 +2,13 @@
 #include "../db/database.h"
 
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
+#define CIMGUI_USE_GLFW
+#define CIMGUI_USE_OPENGL3
 #include <cimgui.h>
 
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #define INPUT_BUF_SIZE 256
 
@@ -30,8 +33,8 @@ void inbox_view_render(Task* tasks, int task_count, int* needs_reload) {
     igSameLine(0, 10);
     
     // Focus input on Ctrl+N
-    ImGuiIO* io = igGetIO();
-    if (io->KeyCtrl && igIsKeyPressed(igGetKeyIndex(ImGuiKey_N), false)) {
+    ImGuiIO* io = igGetIO_Nil();
+    if (io->KeyCtrl && igIsKeyPressed_Bool(ImGuiKey_N, false)) {
         igSetKeyboardFocusHere(0);
     }
     
@@ -95,7 +98,7 @@ void inbox_view_render(Task* tasks, int task_count, int* needs_reload) {
                 igPopItemWidth();
                 
                 // Cancel on Escape
-                if (igIsKeyPressed(igGetKeyIndex(ImGuiKey_Escape), false)) {
+                if (igIsKeyPressed_Bool(ImGuiKey_Escape, false)) {
                     selected_task_id = -1;
                 }
             } else {
