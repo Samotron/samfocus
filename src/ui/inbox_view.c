@@ -8,6 +8,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
 
 #define INPUT_BUF_SIZE 256
@@ -30,7 +31,7 @@ void inbox_view_init(void) {
 }
 
 void inbox_view_render(Task* tasks, int task_count, Project* projects, int project_count,
-                       int selected_project_id, int* needs_reload) {
+                       Context* contexts, int context_count, int selected_project_id, int* needs_reload) {
     *needs_reload = 0;
     
     ImGuiIO* io = igGetIO_Nil();
@@ -362,6 +363,81 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                     }
                     
                     igEndCombo();
+                }
+            }
+            
+            // Context tags display (only show if not editing)
+            if (editing_task_id != task->id && context_count > 0) {
+                // Load contexts for this task
+                Context* task_contexts = NULL;
+                int task_context_count = 0;
+                if (db_get_task_contexts(task->id, &task_contexts, &task_context_count) == 0 && task_context_count > 0) {
+                    igSameLine(0, 10);
+                    for (int j = 0; j < task_context_count; j++) {
+                        char tag[80];
+                        snprintf(tag, sizeof(tag), "@%s", task_contexts[j].name);
+                        igTextColored((ImVec4){0.5f, 0.8f, 0.5f, 1.0f}, "%s", tag);
+                        if (j < task_context_count - 1) {
+                            igSameLine(0, 5);
+                        }
+                    }
+                    free(task_contexts);
+                }
+                
+                // Context management button
+                igSameLine(0, 5);
+                char ctx_btn[32];
+                snprintf(ctx_btn, sizeof(ctx_btn), "@##ctx_%d", task->id);
+                if (igSmallButton(ctx_btn)) {
+                    char popup_id[48];
+                    snprintf(popup_id, sizeof(popup_id), "context_popup_%d", task->id);
+                    igOpenPopup_Str(popup_id, 0);
+                }
+                
+                // Context management popup
+                char popup_id[48];
+                snprintf(popup_id, sizeof(popup_id), "context_popup_%d", task->id);
+                if (igBeginPopup(popup_id, 0)) {
+                    igText("Manage Contexts");
+                    igSeparator();
+                    
+                    // Load current contexts for task
+                    Context* current_contexts = NULL;
+                    int current_context_count = 0;
+                    db_get_task_contexts(task->id, &current_contexts, &current_context_count);
+                    
+                    // Show all contexts with checkboxes
+                    for (int j = 0; j < context_count; j++) {
+                        bool has_context = false;
+                        for (int k = 0; k < current_context_count; k++) {
+                            if (current_contexts[k].id == contexts[j].id) {
+                                has_context = true;
+                                break;
+                            }
+                        }
+                        
+                        char label[80];
+                        snprintf(label, sizeof(label), "@%s", contexts[j].name);
+                        if (igCheckbox(label, &has_context)) {
+                            if (has_context) {
+                                // Add context
+                                if (db_add_context_to_task(task->id, contexts[j].id) == 0) {
+                                    *needs_reload = 1;
+                                }
+                            } else {
+                                // Remove context
+                                if (db_remove_context_from_task(task->id, contexts[j].id) == 0) {
+                                    *needs_reload = 1;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (current_contexts != NULL) {
+                        free(current_contexts);
+                    }
+                    
+                    igEndPopup();
                 }
             }
             

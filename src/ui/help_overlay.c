@@ -71,6 +71,14 @@ void help_overlay_render(bool show_help) {
         igBulletText("Use dropdown (→) - Assign task to project");
         igSpacing();
         
+        // Contexts section
+        igTextColored((ImVec4){1.0f, 0.8f, 0.2f, 1.0f}, "Contexts:");
+        igBulletText("Click '@' button - Manage task contexts");
+        igBulletText("Click context (@home, @computer) - Filter by context");
+        igBulletText("Click '+' in Contexts - Create new context");
+        igBulletText("Right-click context - Delete context");
+        igSpacing();
+        
         // Dates section
         igTextColored((ImVec4){1.0f, 0.8f, 0.2f, 1.0f}, "Defer & Due Dates:");
         igBulletText("'Defer' button - Hide task until tomorrow");

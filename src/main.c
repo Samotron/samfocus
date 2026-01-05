@@ -300,7 +300,7 @@ int main(int argc, char** argv) {
         igSetNextWindowSize((ImVec2){(float)display_w - sidebar_width, (float)display_h}, ImGuiCond_Always);
         int inbox_needs_reload = 0;
         inbox_view_render(tasks, task_count, projects, project_count, 
-                         selected_project_id, &inbox_needs_reload);
+                         contexts, context_count, selected_project_id, &inbox_needs_reload);
         
         // Reload if needed
         if (sidebar_needs_reload) {
