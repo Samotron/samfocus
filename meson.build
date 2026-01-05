@@ -83,10 +83,12 @@ app_sources = files(
   'src/core/task.c',
   'src/core/project.c',
   'src/core/context.c',
+  'src/core/undo.c',
   'src/db/database.c',
   'src/ui/inbox_view.c',
   'src/ui/sidebar.c',
   'src/ui/help_overlay.c',
+  'src/ui/command_palette.c',
 )
 
 # Platform-specific compile args

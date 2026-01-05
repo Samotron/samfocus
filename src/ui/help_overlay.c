@@ -28,7 +28,7 @@ void help_overlay_render(bool show_help) {
                 ImGuiWindowFlags_NoCollapse |
                 ImGuiWindowFlags_NoSavedSettings;
     
-    if (igBegin("Keyboard Shortcuts (Hold ? to view)", NULL, flags)) {
+    if (igBegin("Keyboard Shortcuts (Press ? to toggle)", NULL, flags)) {
         igTextColored((ImVec4){0.4f, 0.8f, 1.0f, 1.0f}, "SamFocus - Keyboard Shortcuts");
         igSeparator();
         igSpacing();
@@ -37,13 +37,26 @@ void help_overlay_render(bool show_help) {
         igTextColored((ImVec4){1.0f, 0.8f, 0.2f, 1.0f}, "Adding Tasks:");
         igBulletText("Ctrl+N - Focus new task input (works anywhere)");
         igBulletText("Enter - Add new task (when in input field)");
+        igBulletText("Quick capture: 'Buy milk @errands #tomorrow !flag'");
+        igBulletText("  @name - Add context, #tomorrow/#today/#weekend - Defer");
+        igBulletText("  !flag or ! - Mark as flagged");
+        igSpacing();
+        
+        // Command Palette section
+        igTextColored((ImVec4){1.0f, 0.8f, 0.2f, 1.0f}, "Command Palette:");
+        igBulletText("Ctrl+K - Open command palette");
+        igBulletText("Type to search tasks, projects, contexts");
+        igBulletText("Type /action for quick commands");
         igSpacing();
         
         // Navigation section
         igTextColored((ImVec4){1.0f, 0.8f, 0.2f, 1.0f}, "Navigation:");
         igBulletText("Up/Down Arrow - Navigate through task list");
+        igBulletText("Ctrl+Up/Down - Reorder selected task");
         igBulletText("Home - Jump to first task");
         igBulletText("End - Jump to last task");
+        igBulletText("Ctrl+1 - Today, Ctrl+2 - Anytime, Ctrl+3 - Flagged");
+        igBulletText("Ctrl+4 - Inbox, Ctrl+5 - Completed");
         igSpacing();
         
         // Task Actions section
@@ -51,6 +64,7 @@ void help_overlay_render(bool show_help) {
         igBulletText("Enter - Edit selected task");
         igBulletText("Space - Toggle completion status");
         igBulletText("Ctrl+Enter - Toggle completion status");
+        igBulletText("F - Toggle flag on selected task");
         igBulletText("Delete - Remove selected task");
         igBulletText("Escape - Cancel edit mode");
         igBulletText("Star (☆/★) button - Flag/unflag task");

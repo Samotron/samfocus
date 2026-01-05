@@ -10,9 +10,81 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <time.h>
+#include <ctype.h>
 
 #define INPUT_BUF_SIZE 256
 #define NOTES_BUF_SIZE 1024
+
+// Parsed task data
+typedef struct {
+    char title[256];
+    char context_names[5][64];  // Up to 5 contexts
+    int context_count;
+    bool flagged;
+    time_t defer_at;
+    time_t due_at;
+} ParsedTask;
+
+// Parse quick capture syntax: "Task title @context1 @context2 #tomorrow !flag"
+static void parse_quick_capture(const char* input, ParsedTask* result) {
+    memset(result, 0, sizeof(ParsedTask));
+    
+    char buffer[INPUT_BUF_SIZE];
+    strncpy(buffer, input, INPUT_BUF_SIZE - 1);
+    buffer[INPUT_BUF_SIZE - 1] = '\0';
+    
+    char title_parts[INPUT_BUF_SIZE] = {0};
+    int title_len = 0;
+    
+    char* token = strtok(buffer, " ");
+    while (token != NULL) {
+        if (token[0] == '@' && strlen(token) > 1) {
+            // Context
+            if (result->context_count < 5) {
+                strncpy(result->context_names[result->context_count], token + 1, 63);
+                result->context_names[result->context_count][63] = '\0';
+                result->context_count++;
+            }
+        } else if (token[0] == '#' && strlen(token) > 1) {
+            // Date keyword
+            const char* date_str = token + 1;
+            time_t now = time(NULL);
+            struct tm* tm_info = localtime(&now);
+            
+            if (strcmp(date_str, "today") == 0) {
+                result->defer_at = now;
+            } else if (strcmp(date_str, "tomorrow") == 0) {
+                tm_info->tm_mday += 1;
+                result->defer_at = mktime(tm_info);
+            } else if (strcmp(date_str, "weekend") == 0) {
+                // Next Saturday
+                int days_until_saturday = (6 - tm_info->tm_wday + 7) % 7;
+                if (days_until_saturday == 0) days_until_saturday = 7;
+                tm_info->tm_mday += days_until_saturday;
+                result->defer_at = mktime(tm_info);
+            }
+        } else if (strcmp(token, "!flag") == 0 || strcmp(token, "!") == 0) {
+            // Flag marker
+            result->flagged = true;
+        } else {
+            // Regular title word
+            if (title_len > 0) {
+                title_parts[title_len++] = ' ';
+            }
+            int token_len = strlen(token);
+            if (title_len + token_len < INPUT_BUF_SIZE - 1) {
+                strcpy(title_parts + title_len, token);
+                title_len += token_len;
+            }
+        }
+        
+        token = strtok(NULL, " ");
+    }
+    
+    strncpy(result->title, title_parts, 255);
+    result->title[255] = '\0';
+}
 
 static char input_buffer[INPUT_BUF_SIZE] = {0};
 static int selected_task_index = -1;  // Index in the task list, not ID
@@ -21,6 +93,7 @@ static char edit_buffer[INPUT_BUF_SIZE] = {0};
 static bool focus_input = false;
 static int editing_notes_task_id = -1;
 static char notes_buffer[NOTES_BUF_SIZE] = {0};
+static char search_buffer[INPUT_BUF_SIZE] = {0};
 
 void inbox_view_init(void) {
     input_buffer[0] = '\0';
@@ -72,6 +145,7 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
     
     // Input field for new tasks
     igText("Add new task (Ctrl+N):");
+    igTextDisabled("Quick syntax: @context #tomorrow !flag");
     igSameLine(0, 10);
     
     // Handle focus request
@@ -88,8 +162,45 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
     if (input_active) {
         // Enter was pressed
         if (input_buffer[0] != '\0') {
-            int task_id = db_insert_task(input_buffer, TASK_STATUS_INBOX);
+            // Parse quick capture syntax
+            ParsedTask parsed;
+            parse_quick_capture(input_buffer, &parsed);
+            
+            // Use original input as title if parsing didn't extract anything
+            const char* task_title = parsed.title[0] != '\0' ? parsed.title : input_buffer;
+            
+            int task_id = db_insert_task(task_title, TASK_STATUS_INBOX);
             if (task_id >= 0) {
+                // Apply parsed attributes
+                if (parsed.flagged) {
+                    db_update_task_flagged(task_id, 1);
+                }
+                if (parsed.defer_at > 0) {
+                    db_update_task_defer_at(task_id, parsed.defer_at);
+                }
+                
+                // Add contexts
+                for (int i = 0; i < parsed.context_count; i++) {
+                    // Find or create context
+                    int context_id = -1;
+                    for (int j = 0; j < context_count; j++) {
+                        if (strcmp(contexts[j].name, parsed.context_names[i]) == 0) {
+                            context_id = contexts[j].id;
+                            break;
+                        }
+                    }
+                    
+                    // Create context if it doesn't exist
+                    if (context_id < 0) {
+                        context_id = db_insert_context(parsed.context_names[i], "#888888");
+                    }
+                    
+                    // Add context to task
+                    if (context_id >= 0) {
+                        db_add_context_to_task(task_id, context_id);
+                    }
+                }
+                
                 input_buffer[0] = '\0';
                 *needs_reload = 1;
                 // Select the first task after adding
@@ -103,8 +214,13 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
     
     igSeparator();
     
-    // Task list header
+    // Task list header with search
     igText("Tasks (%d):", task_count);
+    igSameLine(0, 10);
+    igPushItemWidth(200);
+    igInputTextWithHint("##search", "Search...", search_buffer, INPUT_BUF_SIZE, 
+                        ImGuiInputTextFlags_None, NULL, NULL);
+    igPopItemWidth();
     igSpacing();
     
     if (task_count == 0) {
@@ -113,16 +229,43 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
     } else {
         // Keyboard navigation (when not focused on input)
         if (!input_has_focus && editing_task_id == -1) {
-            // Arrow keys for navigation
-            if (igIsKeyPressed_Bool(ImGuiKey_DownArrow, false)) {
+            // Ctrl+Up/Down for reordering
+            if (io->KeyCtrl && igIsKeyPressed_Bool(ImGuiKey_UpArrow, false)) {
+                if (selected_task_index > 0 && selected_task_index < task_count) {
+                    Task* selected = &tasks[selected_task_index];
+                    Task* above = &tasks[selected_task_index - 1];
+                    
+                    // Swap order_index values
+                    int temp_order = selected->order_index;
+                    if (db_update_task_order_index(selected->id, above->order_index) == 0 &&
+                        db_update_task_order_index(above->id, temp_order) == 0) {
+                        *needs_reload = 1;
+                        selected_task_index--;
+                    }
+                }
+            } else if (io->KeyCtrl && igIsKeyPressed_Bool(ImGuiKey_DownArrow, false)) {
+                if (selected_task_index >= 0 && selected_task_index < task_count - 1) {
+                    Task* selected = &tasks[selected_task_index];
+                    Task* below = &tasks[selected_task_index + 1];
+                    
+                    // Swap order_index values
+                    int temp_order = selected->order_index;
+                    if (db_update_task_order_index(selected->id, below->order_index) == 0 &&
+                        db_update_task_order_index(below->id, temp_order) == 0) {
+                        *needs_reload = 1;
+                        selected_task_index++;
+                    }
+                }
+            }
+            // Arrow keys for navigation (only when Ctrl is not held)
+            else if (igIsKeyPressed_Bool(ImGuiKey_DownArrow, false)) {
                 if (selected_task_index < 0) {
                     selected_task_index = 0;
                 } else if (selected_task_index < task_count - 1) {
                     selected_task_index++;
                 }
             }
-            
-            if (igIsKeyPressed_Bool(ImGuiKey_UpArrow, false)) {
+            else if (igIsKeyPressed_Bool(ImGuiKey_UpArrow, false)) {
                 if (selected_task_index > 0) {
                     selected_task_index--;
                 } else if (selected_task_index < 0 && task_count > 0) {
@@ -169,6 +312,14 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                     }
                 }
                 
+                // F key to toggle flag
+                if (igIsKeyPressed_Bool(ImGuiKey_F, false)) {
+                    int new_flagged = selected->flagged ? 0 : 1;
+                    if (db_update_task_flagged(selected->id, new_flagged) == 0) {
+                        *needs_reload = 1;
+                    }
+                }
+                
                 // Enter to edit
                 if (igIsKeyPressed_Bool(ImGuiKey_Enter, false) && !io->KeyCtrl) {
                     editing_task_id = selected->id;
@@ -183,6 +334,27 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
         
         for (int i = 0; i < task_count; i++) {
             Task* task = &tasks[i];
+            
+            // Filter by search text
+            if (search_buffer[0] != '\0') {
+                // Simple case-insensitive substring search
+                char lower_title[256];
+                char lower_search[256];
+                
+                for (int j = 0; task->title[j] && j < 255; j++) {
+                    lower_title[j] = tolower(task->title[j]);
+                    lower_title[j + 1] = '\0';
+                }
+                for (int j = 0; search_buffer[j] && j < 255; j++) {
+                    lower_search[j] = tolower(search_buffer[j]);
+                    lower_search[j + 1] = '\0';
+                }
+                
+                if (!strstr(lower_title, lower_search)) {
+                    continue;  // Skip this task if it doesn't match search
+                }
+            }
+            
             bool is_selected = (i == selected_task_index);
             
             igPushID_Int(task->id);
