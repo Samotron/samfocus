@@ -46,6 +46,17 @@ static int load_tasks(int project_filter) {
     time_t now = time(NULL);
     struct tm* now_tm = localtime(&now);
     
+    // Find project type if filtering by specific project
+    ProjectType project_type = PROJECT_TYPE_SEQUENTIAL;
+    if (project_filter > 0) {
+        for (int j = 0; j < project_count; j++) {
+            if (projects[j].id == project_filter) {
+                project_type = projects[j].type;
+                break;
+            }
+        }
+    }
+    
     int filtered_count = 0;
     for (int i = 0; i < task_count; i++) {
         // Skip deferred tasks (not yet available) for all perspectives
@@ -85,10 +96,15 @@ static int load_tasks(int project_filter) {
         } else {
             // Specific project: tasks assigned to this project
             if (tasks[i].project_id == project_filter) {
-                // For sequential projects, only show first incomplete task
-                int first_task = db_get_first_incomplete_task_in_project(project_filter);
-                if (first_task == tasks[i].id) {
+                if (project_type == PROJECT_TYPE_PARALLEL) {
+                    // Parallel: show all tasks
                     tasks[filtered_count++] = tasks[i];
+                } else {
+                    // Sequential: only show first incomplete task
+                    int first_task = db_get_first_incomplete_task_in_project(project_filter);
+                    if (first_task == tasks[i].id) {
+                        tasks[filtered_count++] = tasks[i];
+                    }
                 }
             }
         }

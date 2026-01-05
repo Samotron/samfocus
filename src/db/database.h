@@ -118,6 +118,13 @@ int db_load_projects(Project** projects, int* count);
 int db_update_project_title(int id, const char* title);
 
 /**
+ * Update a project's type (sequential/parallel).
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_update_project_type(int id, ProjectType type);
+
+/**
  * Delete a project by ID.
  * Note: Tasks in this project will have their project_id set to NULL.
  * 

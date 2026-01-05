@@ -143,6 +143,20 @@ void sidebar_render(Project* projects, int project_count, int* selected_project_
                     igCloseCurrentPopup();
                 }
                 
+                // Toggle type (Sequential <-> Parallel)
+                const char* type_label = project->type == PROJECT_TYPE_SEQUENTIAL ? 
+                    "Make Parallel" : "Make Sequential";
+                if (igMenuItem_Bool(type_label, NULL, false, true)) {
+                    ProjectType new_type = project->type == PROJECT_TYPE_SEQUENTIAL ? 
+                        PROJECT_TYPE_PARALLEL : PROJECT_TYPE_SEQUENTIAL;
+                    if (db_update_project_type(project->id, new_type) == 0) {
+                        *needs_reload = 1;
+                    }
+                    igCloseCurrentPopup();
+                }
+                
+                igSeparator();
+                
                 if (igMenuItem_Bool("Delete", NULL, false, true)) {
                     if (db_delete_project(project->id) == 0) {
                         *needs_reload = 1;

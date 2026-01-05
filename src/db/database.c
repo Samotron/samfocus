@@ -522,6 +522,37 @@ int db_update_project_title(int id, const char* title) {
     return 0;
 }
 
+int db_update_project_type(int id, ProjectType type) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    const char* sql = "UPDATE projects SET type = ? WHERE id = ?;";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, type);
+    sqlite3_bind_int(stmt, 2, id);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to update project type: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return 0;
+}
+
 int db_delete_project(int id) {
     if (db == NULL) {
         set_error("Database not initialized");
