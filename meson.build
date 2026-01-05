@@ -107,3 +107,20 @@ executable('samfocus',
   c_args: platform_args,
   install: true
 )
+
+# CLI companion tool
+cli_sources = files(
+  'src/cli/samfocus-cli.c',
+  'src/db/database.c',
+  'src/core/task.c',
+  'src/core/project.c',
+  'src/core/context.c',
+)
+
+executable('samfocus-cli',
+  cli_sources,
+  include_directories: src_inc,
+  dependencies: [sqlite_dep],
+  c_args: platform_args,
+  install: true
+)
