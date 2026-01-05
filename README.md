@@ -1,8 +1,8 @@
 # SamFocus
 
-A personal OmniFocus-style task management application built with C, Dear ImGui, and SQLite.
-
+A personal task management application built with C, Dear ImGui, and SQLite.
 ## Features (Phase 0-3 Complete)
+
 
 - **Project Management**: Organize tasks into sequential projects
 - **Sidebar Navigation**: Quick access to Inbox and all projects
