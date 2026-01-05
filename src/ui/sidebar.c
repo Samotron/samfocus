@@ -54,6 +54,12 @@ void sidebar_render(Project* projects, int project_count, int* selected_project_
         *selected_project_id = -1;
     }
     
+    // Anytime perspective (ID = -3)
+    bool anytime_selected = (*selected_project_id == -3);
+    if (igSelectable_Bool("Anytime", anytime_selected, 0, (ImVec2){0, 0})) {
+        *selected_project_id = -3;
+    }
+    
     // Inbox (always visible, ID = 0)
     bool inbox_selected = (*selected_project_id == 0);
     if (igSelectable_Bool("Inbox", inbox_selected, 0, (ImVec2){0, 0})) {

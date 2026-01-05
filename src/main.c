@@ -26,7 +26,7 @@ static Task* tasks = NULL;
 static int task_count = 0;
 static Project* projects = NULL;
 static int project_count = 0;
-static int selected_project_id = -1;  // -1 = Today, 0 = Inbox, >0 = Project ID
+static int selected_project_id = -1;  // -3 = Anytime, -2 = Completed, -1 = Today, 0 = Inbox, >0 = Project ID
 
 // Load tasks from database (optionally filtered by project)
 static int load_tasks(int project_filter) {
@@ -77,7 +77,10 @@ static int load_tasks(int project_filter) {
             continue;
         }
         
-        if (project_filter == -1) {
+        if (project_filter == -3) {
+            // Anytime perspective: show all available tasks (not deferred, not completed)
+            tasks[filtered_count++] = tasks[i];
+        } else if (project_filter == -1) {
             // Today perspective: show tasks that are due today or overdue, or have no due date but are available
             bool include = false;
             

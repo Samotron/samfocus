@@ -56,11 +56,14 @@ void help_overlay_render(bool show_help) {
         igSpacing();
         
         // Projects section
-        igTextColored((ImVec4){1.0f, 0.8f, 0.2f, 1.0f}, "Projects:");
-        igBulletText("Click 'Inbox' - View all unassigned tasks");
+        igTextColored((ImVec4){1.0f, 0.8f, 0.2f, 1.0f}, "Perspectives & Projects:");
+        igBulletText("'Today' - Tasks due today/overdue + available tasks");
+        igBulletText("'Anytime' - All available tasks (not deferred)");
+        igBulletText("'Inbox' - Unassigned tasks");
+        igBulletText("'Completed' - Finished tasks");
         igBulletText("Click project - View project tasks");
         igBulletText("Click '+' - Create new project");
-        igBulletText("Right-click project - Rename or delete");
+        igBulletText("Right-click project - Rename, delete, or toggle type");
         igBulletText("Use dropdown (→) - Assign task to project");
         igSpacing();
         
