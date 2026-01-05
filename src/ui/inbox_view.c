@@ -97,6 +97,11 @@ static char notes_buffer[NOTES_BUF_SIZE] = {0};
 static char search_buffer[INPUT_BUF_SIZE] = {0};
 static bool notes_preview_mode = true;  // Start in preview mode
 
+// Batch operations state
+static bool batch_mode = false;
+static bool selected_tasks[1000] = {0};  // Track selected task IDs
+static int selected_count = 0;
+
 void inbox_view_init(void) {
     input_buffer[0] = '\0';
     selected_task_index = -1;
@@ -229,6 +234,61 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
     igInputTextWithHint("##search", "Search...", search_buffer, INPUT_BUF_SIZE, 
                         ImGuiInputTextFlags_None, NULL, NULL);
     igPopItemWidth();
+    
+    // Batch mode controls
+    igSameLine(0, 20);
+    if (igButton(batch_mode ? "Exit Batch Mode" : "Batch Select", (ImVec2){0, 0})) {
+        batch_mode = !batch_mode;
+        if (!batch_mode) {
+            // Clear selections when exiting
+            memset(selected_tasks, 0, sizeof(selected_tasks));
+            selected_count = 0;
+        }
+    }
+    
+    if (batch_mode && selected_count > 0) {
+        igSameLine(0, 10);
+        igText("(%d selected)", selected_count);
+        igSameLine(0, 10);
+        
+        // Batch actions
+        if (igButton("Complete All", (ImVec2){0, 0})) {
+            for (int i = 0; i < task_count; i++) {
+                if (selected_tasks[tasks[i].id]) {
+                    db_update_task_status(tasks[i].id, TASK_STATUS_DONE);
+                    if (tasks[i].recurrence != RECUR_NONE) {
+                        db_create_recurring_instance(&tasks[i]);
+                    }
+                }
+            }
+            *needs_reload = 1;
+            memset(selected_tasks, 0, sizeof(selected_tasks));
+            selected_count = 0;
+        }
+        
+        igSameLine(0, 5);
+        if (igButton("Delete All", (ImVec2){0, 0})) {
+            for (int i = 0; i < task_count; i++) {
+                if (selected_tasks[tasks[i].id]) {
+                    db_delete_task(tasks[i].id);
+                }
+            }
+            *needs_reload = 1;
+            memset(selected_tasks, 0, sizeof(selected_tasks));
+            selected_count = 0;
+        }
+        
+        igSameLine(0, 5);
+        if (igButton("Flag All", (ImVec2){0, 0})) {
+            for (int i = 0; i < task_count; i++) {
+                if (selected_tasks[tasks[i].id]) {
+                    db_update_task_flagged(tasks[i].id, 1);
+                }
+            }
+            *needs_reload = 1;
+        }
+    }
+    
     igSpacing();
     
     if (task_count == 0) {
@@ -383,16 +443,27 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                                         igGetColorU32_Vec4(selected_color), 0.0f, 0);
             }
             
-            // Checkbox for completion
+            // Checkbox - for batch selection or completion
             bool is_done = (task->status == TASK_STATUS_DONE);
-            if (igCheckbox("##done", &is_done)) {
-                TaskStatus new_status = is_done ? TASK_STATUS_DONE : TASK_STATUS_INBOX;
-                if (db_update_task_status(task->id, new_status) == 0) {
-                    // If completing a recurring task, create next instance
-                    if (is_done && task->recurrence != RECUR_NONE) {
-                        db_create_recurring_instance(task);
+            
+            if (batch_mode) {
+                // In batch mode, show selection checkbox
+                bool is_selected = selected_tasks[task->id];
+                if (igCheckbox("##select", &is_selected)) {
+                    selected_tasks[task->id] = is_selected;
+                    selected_count += is_selected ? 1 : -1;
+                }
+            } else {
+                // Normal mode - completion checkbox
+                if (igCheckbox("##done", &is_done)) {
+                    TaskStatus new_status = is_done ? TASK_STATUS_DONE : TASK_STATUS_INBOX;
+                    if (db_update_task_status(task->id, new_status) == 0) {
+                        // If completing a recurring task, create next instance
+                        if (is_done && task->recurrence != RECUR_NONE) {
+                            db_create_recurring_instance(task);
+                        }
+                        *needs_reload = 1;
                     }
-                    *needs_reload = 1;
                 }
             }
             
