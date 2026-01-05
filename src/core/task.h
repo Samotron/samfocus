@@ -21,6 +21,7 @@ typedef struct {
     time_t defer_at;  // 0 if not deferred (task available immediately)
     time_t due_at;    // 0 if no due date
     int flagged;      // 0 = not flagged, 1 = flagged/starred
+    int order_index;  // Manual ordering within list (lower = higher priority)
 } Task;
 
 #endif // TASK_H

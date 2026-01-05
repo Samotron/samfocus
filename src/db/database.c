@@ -54,11 +54,13 @@ int db_create_schema(void) {
         "    defer_at INTEGER DEFAULT 0,"
         "    due_at INTEGER DEFAULT 0,"
         "    flagged INTEGER DEFAULT 0,"
+        "    order_index INTEGER DEFAULT 0,"
         "    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL"
         ");"
         "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);"
         "CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);"
         "CREATE INDEX IF NOT EXISTS idx_tasks_flagged ON tasks(flagged);"
+        "CREATE INDEX IF NOT EXISTS idx_tasks_order ON tasks(order_index);"
         ""
         "CREATE TABLE IF NOT EXISTS projects ("
         "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -80,6 +82,9 @@ int db_create_schema(void) {
     // Migrate existing databases - add flagged column if it doesn't exist
     // This will fail silently if the column already exists, which is fine
     sqlite3_exec(db, "ALTER TABLE tasks ADD COLUMN flagged INTEGER DEFAULT 0;", NULL, NULL, NULL);
+    
+    // Migrate existing databases - add order_index column if it doesn't exist
+    sqlite3_exec(db, "ALTER TABLE tasks ADD COLUMN order_index INTEGER DEFAULT 0;", NULL, NULL, NULL);
     
     return 0;
 }
@@ -145,11 +150,11 @@ int db_load_tasks(Task** tasks, int* count, int status_filter) {
     // Build query based on filter
     const char* sql;
     if (status_filter >= 0) {
-        sql = "SELECT id, title, notes, project_id, status, created_at, defer_at, due_at, flagged FROM tasks "
-              "WHERE status = ? ORDER BY created_at DESC;";
+        sql = "SELECT id, title, notes, project_id, status, created_at, defer_at, due_at, flagged, order_index FROM tasks "
+              "WHERE status = ? ORDER BY order_index ASC, created_at DESC;";
     } else {
-        sql = "SELECT id, title, notes, project_id, status, created_at, defer_at, due_at, flagged FROM tasks "
-              "ORDER BY created_at DESC;";
+        sql = "SELECT id, title, notes, project_id, status, created_at, defer_at, due_at, flagged, order_index FROM tasks "
+              "ORDER BY order_index ASC, created_at DESC;";
     }
     
     sqlite3_stmt* stmt = NULL;
@@ -205,6 +210,7 @@ int db_load_tasks(Task** tasks, int* count, int status_filter) {
         task->defer_at = (time_t)sqlite3_column_int64(stmt, 6);
         task->due_at = (time_t)sqlite3_column_int64(stmt, 7);
         task->flagged = sqlite3_column_int(stmt, 8);
+        task->order_index = sqlite3_column_int(stmt, 9);
         
         (*count)++;
     }
@@ -408,6 +414,37 @@ int db_update_task_flagged(int id, int flagged) {
     if (rc != SQLITE_DONE) {
         snprintf(error_msg, sizeof(error_msg), 
                  "Failed to update task flagged status: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_update_task_order_index(int id, int order_index) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    const char* sql = "UPDATE tasks SET order_index = ? WHERE id = ?;";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, order_index);
+    sqlite3_bind_int(stmt, 2, id);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to update task order: %s", sqlite3_errmsg(db));
         return -1;
     }
     

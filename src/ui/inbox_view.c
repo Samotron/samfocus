@@ -283,6 +283,45 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                 }
             }
             
+            // Reorder buttons (only show if not editing and there are multiple tasks)
+            if (editing_task_id != task->id && task_count > 1) {
+                igSameLine(0, 5);
+                
+                // Move up button (decrease order_index - move towards top)
+                if (i > 0) {
+                    if (igSmallButton("↑")) {
+                        // Swap order with previous task
+                        Task* prev_task = &tasks[i - 1];
+                        int temp_order = task->order_index;
+                        if (db_update_task_order_index(task->id, prev_task->order_index) == 0 &&
+                            db_update_task_order_index(prev_task->id, temp_order) == 0) {
+                            *needs_reload = 1;
+                            selected_task_index = i - 1;
+                        }
+                    }
+                } else {
+                    igTextDisabled("↑");
+                }
+                
+                igSameLine(0, 2);
+                
+                // Move down button (increase order_index - move towards bottom)
+                if (i < task_count - 1) {
+                    if (igSmallButton("↓")) {
+                        // Swap order with next task
+                        Task* next_task = &tasks[i + 1];
+                        int temp_order = task->order_index;
+                        if (db_update_task_order_index(task->id, next_task->order_index) == 0 &&
+                            db_update_task_order_index(next_task->id, temp_order) == 0) {
+                            *needs_reload = 1;
+                            selected_task_index = i + 1;
+                        }
+                    }
+                } else {
+                    igTextDisabled("↓");
+                }
+            }
+            
             // Project assignment (only show if not editing)
             if (editing_task_id != task->id && project_count > 0) {
                 igSameLine(0, 10);

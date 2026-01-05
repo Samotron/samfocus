@@ -54,6 +54,8 @@ void help_overlay_render(bool show_help) {
         igBulletText("Delete - Remove selected task");
         igBulletText("Escape - Cancel edit mode");
         igBulletText("Star (☆/★) button - Flag/unflag task");
+        igBulletText("↑ button - Move task up in list");
+        igBulletText("↓ button - Move task down in list");
         igSpacing();
         
         // Projects section

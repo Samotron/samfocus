@@ -95,6 +95,16 @@ int db_update_task_due_at(int id, time_t due_at);
 int db_update_task_flagged(int id, int flagged);
 
 /**
+ * Update a task's order index.
+ * 
+ * @param id Task ID
+ * @param order_index Order position (lower = higher priority)
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_update_task_order_index(int id, int order_index);
+
+/**
  * Delete a task by ID.
  * 
  * Returns 0 on success, -1 on error.
