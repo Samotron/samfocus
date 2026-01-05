@@ -119,7 +119,13 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
     
     // Main window (fixed position, set by main.c)
     char window_title[300];
-    if (selected_project_id == -2) {
+    if (selected_project_id == -6) {
+        snprintf(window_title, sizeof(window_title), "Review - Stale Tasks");
+    } else if (selected_project_id == -4) {
+        snprintf(window_title, sizeof(window_title), "Flagged");
+    } else if (selected_project_id == -3) {
+        snprintf(window_title, sizeof(window_title), "Anytime");
+    } else if (selected_project_id == -2) {
         snprintf(window_title, sizeof(window_title), "Completed");
     } else if (selected_project_id == -1) {
         snprintf(window_title, sizeof(window_title), "Today");

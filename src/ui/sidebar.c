@@ -219,6 +219,28 @@ void sidebar_render(Project* projects, int project_count, Context* contexts, int
     }
     
     igSpacing();
+    
+    // Review perspective (ID = -6) - tasks not modified in 7+ days
+    int stale_days = 7;
+    time_t now = time(NULL);
+    time_t week_ago = now - (stale_days * 24 * 60 * 60);
+    int review_count = 0;
+    for (int i = 0; i < task_count; i++) {
+        if (tasks[i].status != TASK_STATUS_DONE && 
+            tasks[i].modified_at > 0 && 
+            tasks[i].modified_at < week_ago) {
+            review_count++;
+        }
+    }
+    
+    char review_label[64];
+    snprintf(review_label, sizeof(review_label), "Review (%d)", review_count);
+    bool review_selected = (*selected_project_id == -6);
+    if (igSelectable_Bool(review_label, review_selected, 0, (ImVec2){0, 0})) {
+        *selected_project_id = -6;
+    }
+    
+    igSpacing();
     igSeparator();
     igSpacing();
     

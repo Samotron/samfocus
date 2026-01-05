@@ -76,12 +76,23 @@ static int load_tasks(int project_filter) {
             continue;
         }
         
+        // For Review perspective (-6), show stale tasks (not modified in 7+ days)
+        if (project_filter == -6) {
+            time_t week_ago = now - (7 * 24 * 60 * 60);
+            if (tasks[i].status != TASK_STATUS_DONE && 
+                tasks[i].modified_at > 0 && 
+                tasks[i].modified_at < week_ago) {
+                tasks[filtered_count++] = tasks[i];
+            }
+            continue;
+        }
+        
         // Skip deferred tasks (not yet available) for all other perspectives
         if (tasks[i].defer_at > 0 && tasks[i].defer_at > now) {
             continue;
         }
         
-        // Skip completed tasks for all perspectives except Completed
+        // Skip completed tasks for all perspectives except Completed and Review
         if (tasks[i].status == TASK_STATUS_DONE) {
             continue;
         }

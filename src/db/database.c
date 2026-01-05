@@ -51,6 +51,7 @@ int db_create_schema(void) {
         "    project_id INTEGER NULL,"
         "    status INTEGER NOT NULL DEFAULT 0,"
         "    created_at INTEGER NOT NULL,"
+        "    modified_at INTEGER NOT NULL,"
         "    defer_at INTEGER DEFAULT 0,"
         "    due_at INTEGER DEFAULT 0,"
         "    flagged INTEGER DEFAULT 0,"
@@ -61,6 +62,7 @@ int db_create_schema(void) {
         "CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);"
         "CREATE INDEX IF NOT EXISTS idx_tasks_flagged ON tasks(flagged);"
         "CREATE INDEX IF NOT EXISTS idx_tasks_order ON tasks(order_index);"
+        "CREATE INDEX IF NOT EXISTS idx_tasks_modified ON tasks(modified_at);"
         ""
         "CREATE TABLE IF NOT EXISTS projects ("
         "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -101,6 +103,12 @@ int db_create_schema(void) {
     // Migrate existing databases - add order_index column if it doesn't exist
     sqlite3_exec(db, "ALTER TABLE tasks ADD COLUMN order_index INTEGER DEFAULT 0;", NULL, NULL, NULL);
     
+    // Migrate existing databases - add modified_at column if it doesn't exist
+    sqlite3_exec(db, "ALTER TABLE tasks ADD COLUMN modified_at INTEGER DEFAULT 0;", NULL, NULL, NULL);
+    
+    // Update any tasks with modified_at=0 to use created_at
+    sqlite3_exec(db, "UPDATE tasks SET modified_at = created_at WHERE modified_at = 0;", NULL, NULL, NULL);
+    
     return 0;
 }
 
@@ -122,7 +130,8 @@ int db_insert_task(const char* title, TaskStatus status) {
         return -1;
     }
     
-    const char* sql = "INSERT INTO tasks (title, status, created_at) VALUES (?, ?, ?);";
+    time_t now = time(NULL);
+    const char* sql = "INSERT INTO tasks (title, status, created_at, modified_at) VALUES (?, ?, ?, ?);";
     sqlite3_stmt* stmt = NULL;
     
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
@@ -134,7 +143,8 @@ int db_insert_task(const char* title, TaskStatus status) {
     
     sqlite3_bind_text(stmt, 1, title, -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(stmt, 2, status);
-    sqlite3_bind_int64(stmt, 3, (sqlite3_int64)time(NULL));
+    sqlite3_bind_int64(stmt, 3, (sqlite3_int64)now);
+    sqlite3_bind_int64(stmt, 4, (sqlite3_int64)now);
     
     rc = sqlite3_step(stmt);
     sqlite3_finalize(stmt);
@@ -165,10 +175,10 @@ int db_load_tasks(Task** tasks, int* count, int status_filter) {
     // Build query based on filter
     const char* sql;
     if (status_filter >= 0) {
-        sql = "SELECT id, title, notes, project_id, status, created_at, defer_at, due_at, flagged, order_index FROM tasks "
+        sql = "SELECT id, title, notes, project_id, status, created_at, modified_at, defer_at, due_at, flagged, order_index FROM tasks "
               "WHERE status = ? ORDER BY order_index ASC, created_at DESC;";
     } else {
-        sql = "SELECT id, title, notes, project_id, status, created_at, defer_at, due_at, flagged, order_index FROM tasks "
+        sql = "SELECT id, title, notes, project_id, status, created_at, modified_at, defer_at, due_at, flagged, order_index FROM tasks "
               "ORDER BY order_index ASC, created_at DESC;";
     }
     
@@ -222,10 +232,11 @@ int db_load_tasks(Task** tasks, int* count, int status_filter) {
         task->project_id = sqlite3_column_int(stmt, 3);
         task->status = (TaskStatus)sqlite3_column_int(stmt, 4);
         task->created_at = (time_t)sqlite3_column_int64(stmt, 5);
-        task->defer_at = (time_t)sqlite3_column_int64(stmt, 6);
-        task->due_at = (time_t)sqlite3_column_int64(stmt, 7);
-        task->flagged = sqlite3_column_int(stmt, 8);
-        task->order_index = sqlite3_column_int(stmt, 9);
+        task->modified_at = (time_t)sqlite3_column_int64(stmt, 6);
+        task->defer_at = (time_t)sqlite3_column_int64(stmt, 7);
+        task->due_at = (time_t)sqlite3_column_int64(stmt, 8);
+        task->flagged = sqlite3_column_int(stmt, 9);
+        task->order_index = sqlite3_column_int(stmt, 10);
         
         (*count)++;
     }
