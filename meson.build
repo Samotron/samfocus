@@ -91,6 +91,7 @@ app_sources = files(
   'src/ui/help_overlay.c',
   'src/ui/command_palette.c',
   'src/ui/markdown.c',
+  'src/ui/launcher.c',
 )
 
 # Platform-specific compile args

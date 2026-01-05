@@ -43,6 +43,13 @@ void help_overlay_render(bool show_help) {
         igSpacing();
         
         // Command Palette section
+        igTextColored((ImVec4){1.0f, 0.8f, 0.2f, 1.0f}, "Quick Launcher:");
+        igBulletText("Ctrl+Space - Toggle Raycast-style launcher");
+        igBulletText("Type to quickly add tasks with natural language");
+        igBulletText("Examples: 'Call mom tomorrow', 'Buy milk ! @errands'");
+        igBulletText("@ - Filter by context, # - Filter by project");
+        igSpacing();
+        
         igTextColored((ImVec4){1.0f, 0.8f, 0.2f, 1.0f}, "Command Palette:");
         igBulletText("Ctrl+K - Open command palette");
         igBulletText("Type to search tasks, projects, contexts");

@@ -19,6 +19,7 @@
 #include "ui/sidebar.h"
 #include "ui/help_overlay.h"
 #include "ui/command_palette.h"
+#include "ui/launcher.h"
 
 // Forward declarations
 static void glfw_error_callback(int error, const char* description);
@@ -279,6 +280,7 @@ int main(int argc, char** argv) {
     inbox_view_init();
     command_palette_init(&cmd_palette);
     undo_init(&undo_stack);
+    launcher_init();
     
     printf("Entering main loop...\n");
     
@@ -311,6 +313,15 @@ int main(int argc, char** argv) {
         if (io->KeyCtrl && igIsKeyPressed_Bool(ImGuiKey_K, false)) {
             command_palette_open(&cmd_palette);
             igOpenPopup_Str("Command Palette", ImGuiPopupFlags_None);
+        }
+        
+        // Ctrl+Space to toggle launcher
+        if (io->KeyCtrl && igIsKeyPressed_Bool(ImGuiKey_Space, false)) {
+            if (launcher_is_visible()) {
+                launcher_hide();
+            } else {
+                launcher_show();
+            }
         }
         
         // Ctrl+1-5 for perspective switching
@@ -433,6 +444,14 @@ int main(int argc, char** argv) {
             }
             // Actions would require getting the current selected task ID from inbox_view
             // For now, task-specific actions in command palette are not fully implemented
+        }
+        
+        // Render launcher (Raycast-style quick add)
+        int launcher_needs_reload = 0;
+        launcher_render(tasks, task_count, projects, project_count,
+                       contexts, context_count, &launcher_needs_reload);
+        if (launcher_needs_reload) {
+            load_tasks(selected_project_id);
         }
         
         // Render help overlay if toggled
