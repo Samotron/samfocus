@@ -58,6 +58,26 @@ int db_update_task_status(int id, TaskStatus status);
 int db_update_task_title(int id, const char* title);
 
 /**
+ * Update a task's defer date.
+ * 
+ * @param id Task ID
+ * @param defer_at Unix timestamp, or 0 to clear
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_update_task_defer_at(int id, time_t defer_at);
+
+/**
+ * Update a task's due date.
+ * 
+ * @param id Task ID
+ * @param due_at Unix timestamp, or 0 to clear
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_update_task_due_at(int id, time_t due_at);
+
+/**
  * Delete a task by ID.
  * 
  * Returns 0 on success, -1 on error.

@@ -64,6 +64,16 @@ void help_overlay_render(bool show_help) {
         igBulletText("Use dropdown (→) - Assign task to project");
         igSpacing();
         
+        // Dates section
+        igTextColored((ImVec4){1.0f, 0.8f, 0.2f, 1.0f}, "Defer & Due Dates:");
+        igBulletText("'Defer' button - Hide task until tomorrow");
+        igBulletText("'Due' button - Set due date to tomorrow");
+        igBulletText("'X' button - Clear defer or due date");
+        igBulletText("Red date - Overdue task");
+        igBulletText("Yellow date - Due today");
+        igBulletText("Green date - Due in the future");
+        igSpacing();
+        
         // Mouse Actions section
         igTextColored((ImVec4){1.0f, 0.8f, 0.2f, 1.0f}, "Mouse Actions:");
         igBulletText("Click task text - Select and edit");

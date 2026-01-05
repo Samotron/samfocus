@@ -303,6 +303,91 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                 }
             }
             
+            // Date information (only show if not editing)
+            if (editing_task_id != task->id) {
+                // Defer date
+                if (task->defer_at > 0) {
+                    igSameLine(0, 10);
+                    struct tm* tm_defer = localtime(&task->defer_at);
+                    char defer_str[32];
+                    strftime(defer_str, sizeof(defer_str), "Defer:%m/%d", tm_defer);
+                    igTextColored((ImVec4){0.7f, 0.7f, 1.0f, 1.0f}, "%s", defer_str);
+                    igSameLine(0, 5);
+                    char clear_defer_btn[32];
+                    snprintf(clear_defer_btn, sizeof(clear_defer_btn), "X##defer_%d", task->id);
+                    if (igSmallButton(clear_defer_btn)) {
+                        if (db_update_task_defer_at(task->id, 0) == 0) {
+                            *needs_reload = 1;
+                        }
+                    }
+                } else {
+                    igSameLine(0, 10);
+                    char defer_btn[32];
+                    snprintf(defer_btn, sizeof(defer_btn), "Defer##defer_%d", task->id);
+                    if (igSmallButton(defer_btn)) {
+                        // Set defer to tomorrow (simple default)
+                        time_t now = time(NULL);
+                        time_t tomorrow = now + (24 * 60 * 60);
+                        if (db_update_task_defer_at(task->id, tomorrow) == 0) {
+                            *needs_reload = 1;
+                        }
+                    }
+                }
+                
+                // Due date
+                if (task->due_at > 0) {
+                    igSameLine(0, 10);
+                    struct tm* tm_due = localtime(&task->due_at);
+                    char due_str[32];
+                    strftime(due_str, sizeof(due_str), "Due:%m/%d", tm_due);
+                    
+                    // Color based on due status
+                    time_t now = time(NULL);
+                    struct tm* now_tm = localtime(&now);
+                    struct tm* due_tm = localtime(&task->due_at);
+                    
+                    // Check if overdue (due date < today)
+                    bool is_overdue = false;
+                    bool is_due_today = false;
+                    
+                    if (due_tm->tm_year < now_tm->tm_year ||
+                        (due_tm->tm_year == now_tm->tm_year && due_tm->tm_yday < now_tm->tm_yday)) {
+                        is_overdue = true;
+                    } else if (due_tm->tm_year == now_tm->tm_year && due_tm->tm_yday == now_tm->tm_yday) {
+                        is_due_today = true;
+                    }
+                    
+                    if (is_overdue) {
+                        igTextColored((ImVec4){1.0f, 0.3f, 0.3f, 1.0f}, "%s", due_str);
+                    } else if (is_due_today) {
+                        igTextColored((ImVec4){1.0f, 0.9f, 0.2f, 1.0f}, "%s", due_str);
+                    } else {
+                        igTextColored((ImVec4){0.7f, 1.0f, 0.7f, 1.0f}, "%s", due_str);
+                    }
+                    
+                    igSameLine(0, 5);
+                    char clear_due_btn[32];
+                    snprintf(clear_due_btn, sizeof(clear_due_btn), "X##due_%d", task->id);
+                    if (igSmallButton(clear_due_btn)) {
+                        if (db_update_task_due_at(task->id, 0) == 0) {
+                            *needs_reload = 1;
+                        }
+                    }
+                } else {
+                    igSameLine(0, 10);
+                    char due_btn[32];
+                    snprintf(due_btn, sizeof(due_btn), "Due##due_%d", task->id);
+                    if (igSmallButton(due_btn)) {
+                        // Set due to tomorrow (simple default)
+                        time_t now = time(NULL);
+                        time_t tomorrow = now + (24 * 60 * 60);
+                        if (db_update_task_due_at(task->id, tomorrow) == 0) {
+                            *needs_reload = 1;
+                        }
+                    }
+                }
+            }
+            
             igPopID();
         }
         

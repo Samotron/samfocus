@@ -42,10 +42,18 @@ static int load_tasks(int project_filter) {
         return -1;
     }
     
+    // Get current time for availability checking
+    time_t now = time(NULL);
+    
     // If filtering by project or inbox, keep only matching tasks
     if (project_filter >= 0) {
         int filtered_count = 0;
         for (int i = 0; i < task_count; i++) {
+            // Skip deferred tasks (not yet available)
+            if (tasks[i].defer_at > 0 && tasks[i].defer_at > now) {
+                continue;
+            }
+            
             if (project_filter == 0) {
                 // Inbox: tasks with no project
                 if (tasks[i].project_id == 0 && tasks[i].status != TASK_STATUS_DONE) {
