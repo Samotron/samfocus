@@ -2,12 +2,14 @@
 
 A personal OmniFocus-style task management application built with C, Dear ImGui, and SQLite.
 
-## Features (Phase 0 + 1)
+## Features (Phase 0-2 Complete)
 
-- **Inbox view**: Capture tasks quickly
+- **Inbox view**: Capture tasks quickly with zero friction
+- **Full keyboard navigation**: Mouse optional for all operations
+- **Arrow key navigation**: Move through tasks with Up/Down
+- **Quick actions**: Space to complete, Delete to remove, Enter to edit
 - **Persistent storage**: SQLite database with platform-specific data directories
 - **Cross-platform**: Works on Linux and Windows
-- **Keyboard-driven**: Minimal mouse required
 - **Local-first**: No sync, no cloud, your data stays with you
 
 ## Building
@@ -96,11 +98,26 @@ meson compile -C build && ./build/samfocus
 
 ### Keyboard Shortcuts
 
-- **Ctrl+N**: Focus new task input (from anywhere)
-- **Enter**: Add new task or save edit
-- **Escape**: Cancel current input/edit
-- **Click task text**: Edit task
-- **Checkbox**: Mark task as complete/incomplete
+**Adding Tasks:**
+- **Ctrl+N**: Focus new task input (works from anywhere)
+- **Enter**: Add new task (when in input field)
+
+**Navigating Tasks:**
+- **Up/Down Arrow**: Navigate through task list
+- **Home**: Jump to first task
+- **End**: Jump to last task
+
+**Task Actions:**
+- **Enter**: Edit selected task
+- **Space**: Toggle completion status of selected task
+- **Ctrl+Enter**: Toggle completion status of selected task
+- **Delete**: Remove selected task
+- **Escape**: Cancel edit mode
+
+**Mouse Actions:**
+- **Click task text**: Select and edit task
+- **Right-click task**: Select task (without editing)
+- **Checkbox**: Toggle completion status
 - **Delete button**: Remove task
 
 ## Data Location
@@ -134,7 +151,7 @@ This project follows an 8-phase development plan:
 
 - [x] **Phase 0**: Ground rules & setup
 - [x] **Phase 1**: Skeleton & persistence
-- [ ] **Phase 2**: Inbox + keyboard flow
+- [x] **Phase 2**: Inbox + keyboard flow
 - [ ] **Phase 3**: Projects
 - [ ] **Phase 4**: Defer & due dates
 - [ ] **Phase 5**: Tags/contexts
