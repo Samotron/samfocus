@@ -60,6 +60,12 @@ void sidebar_render(Project* projects, int project_count, int* selected_project_
         *selected_project_id = 0;
     }
     
+    // Completed perspective (ID = -2)
+    bool completed_selected = (*selected_project_id == -2);
+    if (igSelectable_Bool("Completed", completed_selected, 0, (ImVec2){0, 0})) {
+        *selected_project_id = -2;
+    }
+    
     igSpacing();
     igSeparator();
     igSpacing();

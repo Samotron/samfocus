@@ -59,12 +59,20 @@ static int load_tasks(int project_filter) {
     
     int filtered_count = 0;
     for (int i = 0; i < task_count; i++) {
-        // Skip deferred tasks (not yet available) for all perspectives
+        // For Completed perspective, only show completed tasks
+        if (project_filter == -2) {
+            if (tasks[i].status == TASK_STATUS_DONE) {
+                tasks[filtered_count++] = tasks[i];
+            }
+            continue;
+        }
+        
+        // Skip deferred tasks (not yet available) for all other perspectives
         if (tasks[i].defer_at > 0 && tasks[i].defer_at > now) {
             continue;
         }
         
-        // Skip completed tasks
+        // Skip completed tasks for all perspectives except Completed
         if (tasks[i].status == TASK_STATUS_DONE) {
             continue;
         }
