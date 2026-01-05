@@ -109,6 +109,10 @@ int db_create_schema(void) {
     // Update any tasks with modified_at=0 to use created_at
     sqlite3_exec(db, "UPDATE tasks SET modified_at = created_at WHERE modified_at = 0;", NULL, NULL, NULL);
     
+    // Migrate existing databases - add recurrence columns if they don't exist
+    sqlite3_exec(db, "ALTER TABLE tasks ADD COLUMN recurrence INTEGER DEFAULT 0;", NULL, NULL, NULL);
+    sqlite3_exec(db, "ALTER TABLE tasks ADD COLUMN recurrence_interval INTEGER DEFAULT 1;", NULL, NULL, NULL);
+    
     return 0;
 }
 
@@ -175,10 +179,10 @@ int db_load_tasks(Task** tasks, int* count, int status_filter) {
     // Build query based on filter
     const char* sql;
     if (status_filter >= 0) {
-        sql = "SELECT id, title, notes, project_id, status, created_at, modified_at, defer_at, due_at, flagged, order_index FROM tasks "
+        sql = "SELECT id, title, notes, project_id, status, created_at, modified_at, defer_at, due_at, flagged, order_index, recurrence, recurrence_interval FROM tasks "
               "WHERE status = ? ORDER BY order_index ASC, created_at DESC;";
     } else {
-        sql = "SELECT id, title, notes, project_id, status, created_at, modified_at, defer_at, due_at, flagged, order_index FROM tasks "
+        sql = "SELECT id, title, notes, project_id, status, created_at, modified_at, defer_at, due_at, flagged, order_index, recurrence, recurrence_interval FROM tasks "
               "ORDER BY order_index ASC, created_at DESC;";
     }
     
@@ -237,6 +241,8 @@ int db_load_tasks(Task** tasks, int* count, int status_filter) {
         task->due_at = (time_t)sqlite3_column_int64(stmt, 8);
         task->flagged = sqlite3_column_int(stmt, 9);
         task->order_index = sqlite3_column_int(stmt, 10);
+        task->recurrence = (RecurrencePattern)sqlite3_column_int(stmt, 11);
+        task->recurrence_interval = sqlite3_column_int(stmt, 12);
         
         (*count)++;
     }
@@ -1102,4 +1108,164 @@ int db_get_task_contexts(int task_id, Context** contexts, int* count) {
     }
     
     return 0;
+}
+
+// ============================================================================
+// Recurrence operations
+// ============================================================================
+
+int db_update_task_recurrence(int id, RecurrencePattern pattern, int interval) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    if (interval < 1) {
+        set_error("Recurrence interval must be at least 1");
+        return -1;
+    }
+    
+    const char* sql = "UPDATE tasks SET recurrence = ?, recurrence_interval = ? WHERE id = ?;";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, (int)pattern);
+    sqlite3_bind_int(stmt, 2, interval);
+    sqlite3_bind_int(stmt, 3, id);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to update task recurrence: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_create_recurring_instance(Task* template_task) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    if (template_task == NULL) {
+        set_error("Template task cannot be NULL");
+        return -1;
+    }
+    
+    // Calculate next dates based on recurrence pattern
+    time_t now = time(NULL);
+    time_t next_defer = 0;
+    time_t next_due = 0;
+    
+    if (template_task->defer_at > 0) {
+        struct tm tm_defer = *localtime(&template_task->defer_at);
+        switch (template_task->recurrence) {
+            case RECUR_DAILY:
+                tm_defer.tm_mday += template_task->recurrence_interval;
+                break;
+            case RECUR_WEEKLY:
+                tm_defer.tm_mday += 7 * template_task->recurrence_interval;
+                break;
+            case RECUR_MONTHLY:
+                tm_defer.tm_mon += template_task->recurrence_interval;
+                break;
+            case RECUR_YEARLY:
+                tm_defer.tm_year += template_task->recurrence_interval;
+                break;
+            default:
+                break;
+        }
+        next_defer = mktime(&tm_defer);
+    }
+    
+    if (template_task->due_at > 0) {
+        struct tm tm_due = *localtime(&template_task->due_at);
+        switch (template_task->recurrence) {
+            case RECUR_DAILY:
+                tm_due.tm_mday += template_task->recurrence_interval;
+                break;
+            case RECUR_WEEKLY:
+                tm_due.tm_mday += 7 * template_task->recurrence_interval;
+                break;
+            case RECUR_MONTHLY:
+                tm_due.tm_mon += template_task->recurrence_interval;
+                break;
+            case RECUR_YEARLY:
+                tm_due.tm_year += template_task->recurrence_interval;
+                break;
+            default:
+                break;
+        }
+        next_due = mktime(&tm_due);
+    }
+    
+    // Create the new task instance
+    const char* sql = "INSERT INTO tasks "
+                     "(title, notes, project_id, status, created_at, modified_at, "
+                     "defer_at, due_at, flagged, order_index, recurrence, recurrence_interval) "
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_text(stmt, 1, template_task->title, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, template_task->notes, -1, SQLITE_TRANSIENT);
+    
+    if (template_task->project_id == 0) {
+        sqlite3_bind_null(stmt, 3);
+    } else {
+        sqlite3_bind_int(stmt, 3, template_task->project_id);
+    }
+    
+    // New instance starts as INBOX
+    sqlite3_bind_int(stmt, 4, TASK_STATUS_INBOX);
+    sqlite3_bind_int64(stmt, 5, (sqlite3_int64)now);
+    sqlite3_bind_int64(stmt, 6, (sqlite3_int64)now);
+    sqlite3_bind_int64(stmt, 7, (sqlite3_int64)next_defer);
+    sqlite3_bind_int64(stmt, 8, (sqlite3_int64)next_due);
+    sqlite3_bind_int(stmt, 9, template_task->flagged);
+    sqlite3_bind_int(stmt, 10, template_task->order_index);
+    sqlite3_bind_int(stmt, 11, (int)template_task->recurrence);
+    sqlite3_bind_int(stmt, 12, template_task->recurrence_interval);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to create recurring instance: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    int new_task_id = (int)sqlite3_last_insert_rowid(db);
+    
+    // Copy contexts from template to new instance
+    const char* copy_contexts_sql = 
+        "INSERT INTO task_contexts (task_id, context_id) "
+        "SELECT ?, context_id FROM task_contexts WHERE task_id = ?;";
+    
+    rc = sqlite3_prepare_v2(db, copy_contexts_sql, -1, &stmt, NULL);
+    if (rc == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, new_task_id);
+        sqlite3_bind_int(stmt, 2, template_task->id);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+    
+    return new_task_id;
 }

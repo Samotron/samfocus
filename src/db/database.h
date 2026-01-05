@@ -228,4 +228,29 @@ int db_remove_context_from_task(int task_id, int context_id);
  */
 int db_get_task_contexts(int task_id, Context** contexts, int* count);
 
+// ============================================================================
+// Recurrence operations
+// ============================================================================
+
+/**
+ * Update a task's recurrence pattern and interval.
+ * 
+ * @param id Task ID
+ * @param pattern Recurrence pattern (RECUR_NONE, RECUR_DAILY, etc.)
+ * @param interval Recurrence interval (e.g., every 2 days)
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_update_task_recurrence(int id, RecurrencePattern pattern, int interval);
+
+/**
+ * Create a new recurring instance of a task.
+ * This is called when completing a recurring task to spawn the next instance.
+ * 
+ * @param template_task The completed task to use as template
+ * 
+ * Returns the new task ID on success, -1 on error.
+ */
+int db_create_recurring_instance(Task* template_task);
+
 #endif // DATABASE_H

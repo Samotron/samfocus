@@ -314,6 +314,10 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                     TaskStatus new_status = (selected->status == TASK_STATUS_DONE) ? 
                                            TASK_STATUS_INBOX : TASK_STATUS_DONE;
                     if (db_update_task_status(selected->id, new_status) == 0) {
+                        // If completing a recurring task, create next instance
+                        if (new_status == TASK_STATUS_DONE && selected->recurrence != RECUR_NONE) {
+                            db_create_recurring_instance(selected);
+                        }
                         *needs_reload = 1;
                     }
                 }
@@ -382,6 +386,10 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
             if (igCheckbox("##done", &is_done)) {
                 TaskStatus new_status = is_done ? TASK_STATUS_DONE : TASK_STATUS_INBOX;
                 if (db_update_task_status(task->id, new_status) == 0) {
+                    // If completing a recurring task, create next instance
+                    if (is_done && task->recurrence != RECUR_NONE) {
+                        db_create_recurring_instance(task);
+                    }
                     *needs_reload = 1;
                 }
             }
@@ -778,6 +786,124 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                         if (igSelectable_Bool("Next Week", false, 0, (ImVec2){0, 0})) {
                             time_t next_week = now + (7 * 24 * 60 * 60);
                             if (db_update_task_due_at(task->id, next_week) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        igEndPopup();
+                    }
+                }
+            }
+            
+            // Recurrence indicator/button
+            if (editing_task_id != task->id) {
+                igSameLine(0, 10);
+                
+                // Show recurrence icon if task has recurrence
+                if (task->recurrence != RECUR_NONE) {
+                    const char* recur_names[] = {"", "Daily", "Weekly", "Monthly", "Yearly"};
+                    char recur_label[64];
+                    if (task->recurrence_interval == 1) {
+                        snprintf(recur_label, sizeof(recur_label), "🔄%s##recur_%d", 
+                                recur_names[task->recurrence], task->id);
+                    } else {
+                        snprintf(recur_label, sizeof(recur_label), "🔄Every %d %s##recur_%d", 
+                                task->recurrence_interval, recur_names[task->recurrence], task->id);
+                    }
+                    
+                    igPushStyleColor_Vec4(ImGuiCol_Button, (ImVec4){0.2f, 0.6f, 0.4f, 1.0f});
+                    if (igSmallButton(recur_label)) {
+                        char popup_id[48];
+                        snprintf(popup_id, sizeof(popup_id), "recur_popup_%d", task->id);
+                        igOpenPopup_Str(popup_id, 0);
+                    }
+                    igPopStyleColor(1);
+                    
+                    // Recurrence popup
+                    char recur_popup_id[48];
+                    snprintf(recur_popup_id, sizeof(recur_popup_id), "recur_popup_%d", task->id);
+                    if (igBeginPopup(recur_popup_id, 0)) {
+                        igText("Recurrence Pattern");
+                        igSeparator();
+                        
+                        if (igSelectable_Bool("None (Remove)", false, 0, (ImVec2){0, 0})) {
+                            if (db_update_task_recurrence(task->id, RECUR_NONE, 1) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        if (igSelectable_Bool("Daily", false, 0, (ImVec2){0, 0})) {
+                            if (db_update_task_recurrence(task->id, RECUR_DAILY, 1) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        if (igSelectable_Bool("Weekly", false, 0, (ImVec2){0, 0})) {
+                            if (db_update_task_recurrence(task->id, RECUR_WEEKLY, 1) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        if (igSelectable_Bool("Monthly", false, 0, (ImVec2){0, 0})) {
+                            if (db_update_task_recurrence(task->id, RECUR_MONTHLY, 1) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        if (igSelectable_Bool("Yearly", false, 0, (ImVec2){0, 0})) {
+                            if (db_update_task_recurrence(task->id, RECUR_YEARLY, 1) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        igEndPopup();
+                    }
+                } else {
+                    // No recurrence - show "Repeat" button
+                    char recur_btn[32];
+                    snprintf(recur_btn, sizeof(recur_btn), "Repeat##recur_%d", task->id);
+                    if (igSmallButton(recur_btn)) {
+                        char popup_id[48];
+                        snprintf(popup_id, sizeof(popup_id), "recur_popup_%d", task->id);
+                        igOpenPopup_Str(popup_id, 0);
+                    }
+                    
+                    // Recurrence popup
+                    char recur_popup_id[48];
+                    snprintf(recur_popup_id, sizeof(recur_popup_id), "recur_popup_%d", task->id);
+                    if (igBeginPopup(recur_popup_id, 0)) {
+                        igText("Set Recurrence");
+                        igSeparator();
+                        
+                        if (igSelectable_Bool("Daily", false, 0, (ImVec2){0, 0})) {
+                            if (db_update_task_recurrence(task->id, RECUR_DAILY, 1) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        if (igSelectable_Bool("Weekly", false, 0, (ImVec2){0, 0})) {
+                            if (db_update_task_recurrence(task->id, RECUR_WEEKLY, 1) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        if (igSelectable_Bool("Monthly", false, 0, (ImVec2){0, 0})) {
+                            if (db_update_task_recurrence(task->id, RECUR_MONTHLY, 1) == 0) {
+                                *needs_reload = 1;
+                            }
+                            igCloseCurrentPopup();
+                        }
+                        
+                        if (igSelectable_Bool("Yearly", false, 0, (ImVec2){0, 0})) {
+                            if (db_update_task_recurrence(task->id, RECUR_YEARLY, 1) == 0) {
                                 *needs_reload = 1;
                             }
                             igCloseCurrentPopup();

@@ -10,6 +10,15 @@ typedef enum {
     TASK_STATUS_DONE = 2
 } TaskStatus;
 
+// Recurrence pattern enumeration
+typedef enum {
+    RECUR_NONE = 0,
+    RECUR_DAILY = 1,
+    RECUR_WEEKLY = 2,
+    RECUR_MONTHLY = 3,
+    RECUR_YEARLY = 4
+} RecurrencePattern;
+
 // Task structure
 typedef struct {
     int id;
@@ -23,6 +32,8 @@ typedef struct {
     time_t due_at;    // 0 if no due date
     int flagged;      // 0 = not flagged, 1 = flagged/starred
     int order_index;  // Manual ordering within list (lower = higher priority)
+    RecurrencePattern recurrence;  // Recurrence pattern
+    int recurrence_interval;  // Interval for recurrence (e.g., every 2 days)
 } Task;
 
 #endif // TASK_H
