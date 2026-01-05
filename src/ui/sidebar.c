@@ -44,12 +44,28 @@ void sidebar_render(Project* projects, int project_count, int* selected_project_
     igSeparator();
     igSpacing();
     
-    // Inbox (always visible)
+    // Perspectives section
+    igTextColored((ImVec4){0.7f, 0.7f, 0.7f, 1.0f}, "Perspectives");
+    igSpacing();
+    
+    // Today perspective (ID = -1)
+    bool today_selected = (*selected_project_id == -1);
+    if (igSelectable_Bool("Today", today_selected, 0, (ImVec2){0, 0})) {
+        *selected_project_id = -1;
+    }
+    
+    // Inbox (always visible, ID = 0)
     bool inbox_selected = (*selected_project_id == 0);
     if (igSelectable_Bool("Inbox", inbox_selected, 0, (ImVec2){0, 0})) {
         *selected_project_id = 0;
     }
     
+    igSpacing();
+    igSeparator();
+    igSpacing();
+    
+    // Projects section
+    igTextColored((ImVec4){0.7f, 0.7f, 0.7f, 1.0f}, "Projects");
     igSpacing();
     
     // New project input

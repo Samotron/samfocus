@@ -42,7 +42,9 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
     
     // Main window (fixed position, set by main.c)
     char window_title[300];
-    if (selected_project_id == 0) {
+    if (selected_project_id == -1) {
+        snprintf(window_title, sizeof(window_title), "Today");
+    } else if (selected_project_id == 0) {
         snprintf(window_title, sizeof(window_title), "Inbox");
     } else {
         // Find project name

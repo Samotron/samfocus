@@ -26,7 +26,7 @@ static Task* tasks = NULL;
 static int task_count = 0;
 static Project* projects = NULL;
 static int project_count = 0;
-static int selected_project_id = 0;  // 0 = Inbox
+static int selected_project_id = -1;  // -1 = Today, 0 = Inbox, >0 = Project ID
 
 // Load tasks from database (optionally filtered by project)
 static int load_tasks(int project_filter) {
@@ -44,34 +44,56 @@ static int load_tasks(int project_filter) {
     
     // Get current time for availability checking
     time_t now = time(NULL);
+    struct tm* now_tm = localtime(&now);
     
-    // If filtering by project or inbox, keep only matching tasks
-    if (project_filter >= 0) {
-        int filtered_count = 0;
-        for (int i = 0; i < task_count; i++) {
-            // Skip deferred tasks (not yet available)
-            if (tasks[i].defer_at > 0 && tasks[i].defer_at > now) {
-                continue;
-            }
+    int filtered_count = 0;
+    for (int i = 0; i < task_count; i++) {
+        // Skip deferred tasks (not yet available) for all perspectives
+        if (tasks[i].defer_at > 0 && tasks[i].defer_at > now) {
+            continue;
+        }
+        
+        // Skip completed tasks
+        if (tasks[i].status == TASK_STATUS_DONE) {
+            continue;
+        }
+        
+        if (project_filter == -1) {
+            // Today perspective: show tasks that are due today or overdue, or have no due date but are available
+            bool include = false;
             
-            if (project_filter == 0) {
-                // Inbox: tasks with no project
-                if (tasks[i].project_id == 0 && tasks[i].status != TASK_STATUS_DONE) {
-                    tasks[filtered_count++] = tasks[i];
+            if (tasks[i].due_at > 0) {
+                struct tm* due_tm = localtime(&tasks[i].due_at);
+                // Check if due today or overdue
+                if (due_tm->tm_year < now_tm->tm_year ||
+                    (due_tm->tm_year == now_tm->tm_year && due_tm->tm_yday <= now_tm->tm_yday)) {
+                    include = true;
                 }
             } else {
-                // Specific project: tasks assigned to this project
-                if (tasks[i].project_id == project_filter && tasks[i].status != TASK_STATUS_DONE) {
-                    // For sequential projects, only show first incomplete task
-                    int first_task = db_get_first_incomplete_task_in_project(project_filter);
-                    if (first_task == tasks[i].id) {
-                        tasks[filtered_count++] = tasks[i];
-                    }
+                // Tasks without due date: include if they're available (not deferred)
+                include = true;
+            }
+            
+            if (include) {
+                tasks[filtered_count++] = tasks[i];
+            }
+        } else if (project_filter == 0) {
+            // Inbox: tasks with no project
+            if (tasks[i].project_id == 0) {
+                tasks[filtered_count++] = tasks[i];
+            }
+        } else {
+            // Specific project: tasks assigned to this project
+            if (tasks[i].project_id == project_filter) {
+                // For sequential projects, only show first incomplete task
+                int first_task = db_get_first_incomplete_task_in_project(project_filter);
+                if (first_task == tasks[i].id) {
+                    tasks[filtered_count++] = tasks[i];
                 }
             }
         }
-        task_count = filtered_count;
     }
+    task_count = filtered_count;
     
     return 0;
 }
