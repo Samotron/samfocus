@@ -11,12 +11,15 @@
 #include <stdbool.h>
 
 #define INPUT_BUF_SIZE 256
+#define NOTES_BUF_SIZE 1024
 
 static char input_buffer[INPUT_BUF_SIZE] = {0};
 static int selected_task_index = -1;  // Index in the task list, not ID
 static int editing_task_id = -1;
 static char edit_buffer[INPUT_BUF_SIZE] = {0};
 static bool focus_input = false;
+static int editing_notes_task_id = -1;
+static char notes_buffer[NOTES_BUF_SIZE] = {0};
 
 void inbox_view_init(void) {
     input_buffer[0] = '\0';
@@ -471,6 +474,62 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                         
                         igEndPopup();
                     }
+                }
+            }
+            
+            // Notes button/indicator
+            if (editing_task_id != task->id) {
+                igSameLine(0, 10);
+                bool has_notes = (task->notes[0] != '\0');
+                char notes_btn[32];
+                snprintf(notes_btn, sizeof(notes_btn), "%s##notes_%d", 
+                        has_notes ? "Notes*" : "Notes", task->id);
+                
+                if (has_notes) {
+                    igPushStyleColor_Vec4(ImGuiCol_Button, (ImVec4){0.2f, 0.4f, 0.6f, 1.0f});
+                }
+                
+                if (igSmallButton(notes_btn)) {
+                    editing_notes_task_id = task->id;
+                    strncpy(notes_buffer, task->notes, NOTES_BUF_SIZE - 1);
+                    notes_buffer[NOTES_BUF_SIZE - 1] = '\0';
+                    char popup_id[48];
+                    snprintf(popup_id, sizeof(popup_id), "notes_popup_%d", task->id);
+                    igOpenPopup_Str(popup_id, 0);
+                }
+                
+                if (has_notes) {
+                    igPopStyleColor(1);
+                }
+                
+                // Notes popup
+                char notes_popup_id[48];
+                snprintf(notes_popup_id, sizeof(notes_popup_id), "notes_popup_%d", task->id);
+                if (igBeginPopup(notes_popup_id, 0)) {
+                    igText("Notes for: %s", task->title);
+                    igSeparator();
+                    igSpacing();
+                    
+                    igPushItemWidth(400);
+                    if (igInputTextMultiline("##notes_edit", notes_buffer, NOTES_BUF_SIZE, 
+                                             (ImVec2){400, 200}, 0, NULL, NULL)) {
+                        // Text changed
+                    }
+                    igPopItemWidth();
+                    
+                    igSpacing();
+                    if (igButton("Save", (ImVec2){0, 0})) {
+                        if (db_update_task_notes(task->id, notes_buffer) == 0) {
+                            *needs_reload = 1;
+                        }
+                        igCloseCurrentPopup();
+                    }
+                    igSameLine(0, 10);
+                    if (igButton("Cancel", (ImVec2){0, 0})) {
+                        igCloseCurrentPopup();
+                    }
+                    
+                    igEndPopup();
                 }
             }
             

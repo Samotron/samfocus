@@ -47,6 +47,7 @@ int db_create_schema(void) {
         "CREATE TABLE IF NOT EXISTS tasks ("
         "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
         "    title TEXT NOT NULL,"
+        "    notes TEXT DEFAULT '',"
         "    project_id INTEGER NULL,"
         "    status INTEGER NOT NULL DEFAULT 0,"
         "    created_at INTEGER NOT NULL,"
@@ -138,10 +139,10 @@ int db_load_tasks(Task** tasks, int* count, int status_filter) {
     // Build query based on filter
     const char* sql;
     if (status_filter >= 0) {
-        sql = "SELECT id, title, project_id, status, created_at, defer_at, due_at FROM tasks "
+        sql = "SELECT id, title, notes, project_id, status, created_at, defer_at, due_at FROM tasks "
               "WHERE status = ? ORDER BY created_at DESC;";
     } else {
-        sql = "SELECT id, title, project_id, status, created_at, defer_at, due_at FROM tasks "
+        sql = "SELECT id, title, notes, project_id, status, created_at, defer_at, due_at FROM tasks "
               "ORDER BY created_at DESC;";
     }
     
@@ -188,11 +189,15 @@ int db_load_tasks(Task** tasks, int* count, int status_filter) {
         strncpy(task->title, title ? title : "", sizeof(task->title) - 1);
         task->title[sizeof(task->title) - 1] = '\0';
         
-        task->project_id = sqlite3_column_int(stmt, 2);
-        task->status = (TaskStatus)sqlite3_column_int(stmt, 3);
-        task->created_at = (time_t)sqlite3_column_int64(stmt, 4);
-        task->defer_at = (time_t)sqlite3_column_int64(stmt, 5);
-        task->due_at = (time_t)sqlite3_column_int64(stmt, 6);
+        const char* notes = (const char*)sqlite3_column_text(stmt, 2);
+        strncpy(task->notes, notes ? notes : "", sizeof(task->notes) - 1);
+        task->notes[sizeof(task->notes) - 1] = '\0';
+        
+        task->project_id = sqlite3_column_int(stmt, 3);
+        task->status = (TaskStatus)sqlite3_column_int(stmt, 4);
+        task->created_at = (time_t)sqlite3_column_int64(stmt, 5);
+        task->defer_at = (time_t)sqlite3_column_int64(stmt, 6);
+        task->due_at = (time_t)sqlite3_column_int64(stmt, 7);
         
         (*count)++;
     }
@@ -272,6 +277,37 @@ int db_update_task_title(int id, const char* title) {
     if (rc != SQLITE_DONE) {
         snprintf(error_msg, sizeof(error_msg), 
                  "Failed to update task: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_update_task_notes(int id, const char* notes) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    const char* sql = "UPDATE tasks SET notes = ? WHERE id = ?;";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_text(stmt, 1, notes ? notes : "", -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, id);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to update task notes: %s", sqlite3_errmsg(db));
         return -1;
     }
     

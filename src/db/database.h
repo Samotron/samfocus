@@ -58,6 +58,13 @@ int db_update_task_status(int id, TaskStatus status);
 int db_update_task_title(int id, const char* title);
 
 /**
+ * Update a task's notes.
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_update_task_notes(int id, const char* notes);
+
+/**
  * Update a task's defer date.
  * 
  * @param id Task ID

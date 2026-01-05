@@ -14,6 +14,7 @@ typedef enum {
 typedef struct {
     int id;
     char title[256];
+    char notes[1024];  // Task notes/description
     int project_id;  // NULL/0 if not assigned to a project
     TaskStatus status;
     time_t created_at;
