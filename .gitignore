@@ -19,6 +19,10 @@ subprojects/sqlite-*/
 *.swp
 *.swo
 *~
+.cache/
+
+# ImGui settings
+imgui.ini
 
 # OS files
 .DS_Store
