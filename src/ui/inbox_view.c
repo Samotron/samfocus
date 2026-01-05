@@ -1,4 +1,5 @@
 #include "inbox_view.h"
+#include "markdown.h"
 #include "../db/database.h"
 
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
@@ -94,6 +95,7 @@ static bool focus_input = false;
 static int editing_notes_task_id = -1;
 static char notes_buffer[NOTES_BUF_SIZE] = {0};
 static char search_buffer[INPUT_BUF_SIZE] = {0};
+static bool notes_preview_mode = true;  // Start in preview mode
 
 void inbox_view_init(void) {
     input_buffer[0] = '\0';
@@ -945,14 +947,30 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
                 if (igBeginPopup(notes_popup_id, 0)) {
                     igText("Notes for: %s", task->title);
                     igSeparator();
+                    
+                    // Toggle between preview and edit modes
+                    igSpacing();
+                    if (igButton(notes_preview_mode ? "Edit" : "Preview", (ImVec2){80, 0})) {
+                        notes_preview_mode = !notes_preview_mode;
+                    }
+                    igSameLine(0, 10);
+                    igTextDisabled(notes_preview_mode ? "(Markdown Preview)" : "(Edit Mode)");
                     igSpacing();
                     
-                    igPushItemWidth(400);
-                    if (igInputTextMultiline("##notes_edit", notes_buffer, NOTES_BUF_SIZE, 
-                                             (ImVec2){400, 200}, 0, NULL, NULL)) {
-                        // Text changed
+                    if (notes_preview_mode) {
+                        // Preview mode with markdown rendering
+                        igBeginChild_Str("notes_preview", (ImVec2){400, 200}, true, 0);
+                        markdown_render(notes_buffer);
+                        igEndChild();
+                    } else {
+                        // Edit mode with text input
+                        igPushItemWidth(400);
+                        if (igInputTextMultiline("##notes_edit", notes_buffer, NOTES_BUF_SIZE, 
+                                                 (ImVec2){400, 200}, 0, NULL, NULL)) {
+                            // Text changed
+                        }
+                        igPopItemWidth();
                     }
-                    igPopItemWidth();
                     
                     igSpacing();
                     if (igButton("Save", (ImVec2){0, 0})) {
