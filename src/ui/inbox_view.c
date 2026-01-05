@@ -40,7 +40,7 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
         editing_task_id = -1;
     }
     
-    // Main window
+    // Main window (fixed position, set by main.c)
     char window_title[300];
     if (selected_project_id == 0) {
         snprintf(window_title, sizeof(window_title), "Inbox");
@@ -55,7 +55,12 @@ void inbox_view_render(Task* tasks, int task_count, Project* projects, int proje
         }
         snprintf(window_title, sizeof(window_title), "Project: %s", project_name);
     }
-    igBegin(window_title, NULL, 0);
+    
+    int window_flags = ImGuiWindowFlags_NoCollapse | 
+                       ImGuiWindowFlags_NoMove | 
+                       ImGuiWindowFlags_NoResize |
+                       ImGuiWindowFlags_NoTitleBar;
+    igBegin(window_title, NULL, window_flags);
     
     // Input field for new tasks
     igText("Add new task (Ctrl+N):");

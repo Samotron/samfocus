@@ -85,6 +85,7 @@ app_sources = files(
   'src/db/database.c',
   'src/ui/inbox_view.c',
   'src/ui/sidebar.c',
+  'src/ui/help_overlay.c',
 )
 
 # Platform-specific compile args

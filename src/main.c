@@ -14,6 +14,7 @@
 #include "db/database.h"
 #include "ui/inbox_view.h"
 #include "ui/sidebar.h"
+#include "ui/help_overlay.h"
 
 // Forward declarations
 static void glfw_error_callback(int error, const char* description);
@@ -184,7 +185,18 @@ int main(int argc, char** argv) {
         ImGui_ImplGlfw_NewFrame();
         igNewFrame();
         
-        // Render sidebar
+        // Get window dimensions for layout
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        const float sidebar_width = 250.0f;
+        
+        // Check if '?' key is held (Shift + /)
+        ImGuiIO* io = igGetIO_Nil();
+        bool show_help = io->KeyShift && igIsKeyDown_Nil(ImGuiKey_Slash);
+        
+        // Position and render sidebar on the left
+        igSetNextWindowPos((ImVec2){0, 0}, ImGuiCond_Always, (ImVec2){0, 0});
+        igSetNextWindowSize((ImVec2){sidebar_width, (float)display_h}, ImGuiCond_Always);
         int sidebar_needs_reload = 0;
         int prev_project = selected_project_id;
         sidebar_render(projects, project_count, &selected_project_id, &sidebar_needs_reload);
@@ -194,7 +206,9 @@ int main(int argc, char** argv) {
             load_tasks(selected_project_id);
         }
         
-        // Render inbox/project view
+        // Position and render inbox/project view on the right
+        igSetNextWindowPos((ImVec2){sidebar_width, 0}, ImGuiCond_Always, (ImVec2){0, 0});
+        igSetNextWindowSize((ImVec2){(float)display_w - sidebar_width, (float)display_h}, ImGuiCond_Always);
         int inbox_needs_reload = 0;
         inbox_view_render(tasks, task_count, projects, project_count, 
                          selected_project_id, &inbox_needs_reload);
@@ -207,10 +221,12 @@ int main(int argc, char** argv) {
             load_tasks(selected_project_id);
         }
         
+        // Render help overlay if '?' is held
+        help_overlay_render(show_help);
+        
         // Rendering
         igRender();
         
-        int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);

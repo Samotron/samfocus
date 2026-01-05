@@ -27,8 +27,12 @@ void sidebar_init(void) {
 void sidebar_render(Project* projects, int project_count, int* selected_project_id, int* needs_reload) {
     *needs_reload = 0;
     
-    // Sidebar window
-    igBegin("Projects", NULL, ImGuiWindowFlags_NoCollapse);
+    // Sidebar window (fixed position, set by main.c)
+    int window_flags = ImGuiWindowFlags_NoCollapse | 
+                       ImGuiWindowFlags_NoMove | 
+                       ImGuiWindowFlags_NoResize |
+                       ImGuiWindowFlags_NoTitleBar;
+    igBegin("Projects", NULL, window_flags);
     
     // Header
     igText("Projects");
