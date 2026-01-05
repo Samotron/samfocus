@@ -49,10 +49,18 @@ int db_create_schema(void) {
         "    title TEXT NOT NULL,"
         "    project_id INTEGER NULL,"
         "    status INTEGER NOT NULL DEFAULT 0,"
-        "    created_at INTEGER NOT NULL"
+        "    created_at INTEGER NOT NULL,"
+        "    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL"
         ");"
         "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);"
-        "CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);";
+        "CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);"
+        ""
+        "CREATE TABLE IF NOT EXISTS projects ("
+        "    id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "    title TEXT NOT NULL,"
+        "    type INTEGER NOT NULL DEFAULT 0,"
+        "    created_at INTEGER NOT NULL"
+        ");";
     
     char* err = NULL;
     int rc = sqlite3_exec(db, schema, NULL, NULL, &err);
@@ -294,4 +302,277 @@ int db_delete_task(int id) {
     }
     
     return 0;
+}
+
+// ============================================================================
+// Project operations
+// ============================================================================
+
+int db_insert_project(const char* title, ProjectType type) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    if (title == NULL || title[0] == '\0') {
+        set_error("Project title cannot be empty");
+        return -1;
+    }
+    
+    const char* sql = "INSERT INTO projects (title, type, created_at) VALUES (?, ?, ?);";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_text(stmt, 1, title, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, type);
+    sqlite3_bind_int64(stmt, 3, (sqlite3_int64)time(NULL));
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to insert project: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return (int)sqlite3_last_insert_rowid(db);
+}
+
+int db_load_projects(Project** projects, int* count) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    if (projects == NULL || count == NULL) {
+        set_error("Invalid parameters");
+        return -1;
+    }
+    
+    *projects = NULL;
+    *count = 0;
+    
+    const char* sql = "SELECT id, title, type, created_at FROM projects "
+                     "ORDER BY created_at ASC;";
+    
+    sqlite3_stmt* stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    int capacity = 16;
+    *projects = (Project*)malloc(sizeof(Project) * capacity);
+    if (*projects == NULL) {
+        set_error("Out of memory");
+        sqlite3_finalize(stmt);
+        return -1;
+    }
+    
+    while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        if (*count >= capacity) {
+            capacity *= 2;
+            Project* new_projects = (Project*)realloc(*projects, sizeof(Project) * capacity);
+            if (new_projects == NULL) {
+                set_error("Out of memory");
+                free(*projects);
+                *projects = NULL;
+                *count = 0;
+                sqlite3_finalize(stmt);
+                return -1;
+            }
+            *projects = new_projects;
+        }
+        
+        Project* project = &(*projects)[*count];
+        project->id = sqlite3_column_int(stmt, 0);
+        
+        const char* title = (const char*)sqlite3_column_text(stmt, 1);
+        strncpy(project->title, title ? title : "", sizeof(project->title) - 1);
+        project->title[sizeof(project->title) - 1] = '\0';
+        
+        project->type = (ProjectType)sqlite3_column_int(stmt, 2);
+        project->created_at = (time_t)sqlite3_column_int64(stmt, 3);
+        
+        (*count)++;
+    }
+    
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Error reading projects: %s", sqlite3_errmsg(db));
+        free(*projects);
+        *projects = NULL;
+        *count = 0;
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_update_project_title(int id, const char* title) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    if (title == NULL || title[0] == '\0') {
+        set_error("Project title cannot be empty");
+        return -1;
+    }
+    
+    const char* sql = "UPDATE projects SET title = ? WHERE id = ?;";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_text(stmt, 1, title, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, id);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to update project: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_delete_project(int id) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    // First, unassign all tasks from this project
+    const char* unassign_sql = "UPDATE tasks SET project_id = NULL WHERE project_id = ?;";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, unassign_sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, id);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to unassign tasks: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    // Now delete the project
+    const char* delete_sql = "DELETE FROM projects WHERE id = ?;";
+    rc = sqlite3_prepare_v2(db, delete_sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    sqlite3_bind_int(stmt, 1, id);
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to delete project: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_assign_task_to_project(int task_id, int project_id) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -1;
+    }
+    
+    const char* sql = "UPDATE tasks SET project_id = ? WHERE id = ?;";
+    sqlite3_stmt* stmt = NULL;
+    
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    if (project_id == 0) {
+        sqlite3_bind_null(stmt, 1);
+    } else {
+        sqlite3_bind_int(stmt, 1, project_id);
+    }
+    sqlite3_bind_int(stmt, 2, task_id);
+    
+    rc = sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+    
+    if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to assign task to project: %s", sqlite3_errmsg(db));
+        return -1;
+    }
+    
+    return 0;
+}
+
+int db_get_first_incomplete_task_in_project(int project_id) {
+    if (db == NULL) {
+        set_error("Database not initialized");
+        return -2;
+    }
+    
+    const char* sql = "SELECT id FROM tasks "
+                     "WHERE project_id = ? AND status != ? "
+                     "ORDER BY created_at ASC LIMIT 1;";
+    
+    sqlite3_stmt* stmt = NULL;
+    int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Failed to prepare statement: %s", sqlite3_errmsg(db));
+        return -2;
+    }
+    
+    sqlite3_bind_int(stmt, 1, project_id);
+    sqlite3_bind_int(stmt, 2, TASK_STATUS_DONE);
+    
+    rc = sqlite3_step(stmt);
+    
+    int task_id = -1;
+    if (rc == SQLITE_ROW) {
+        task_id = sqlite3_column_int(stmt, 0);
+    } else if (rc != SQLITE_DONE) {
+        snprintf(error_msg, sizeof(error_msg), 
+                 "Error querying first task: %s", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt);
+        return -2;
+    }
+    
+    sqlite3_finalize(stmt);
+    return task_id;
 }

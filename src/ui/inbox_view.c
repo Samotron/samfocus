@@ -26,7 +26,8 @@ void inbox_view_init(void) {
     focus_input = false;
 }
 
-void inbox_view_render(Task* tasks, int task_count, int* needs_reload) {
+void inbox_view_render(Task* tasks, int task_count, Project* projects, int project_count,
+                       int selected_project_id, int* needs_reload) {
     *needs_reload = 0;
     
     ImGuiIO* io = igGetIO_Nil();
@@ -40,7 +41,21 @@ void inbox_view_render(Task* tasks, int task_count, int* needs_reload) {
     }
     
     // Main window
-    igBegin("Inbox", NULL, 0);
+    char window_title[300];
+    if (selected_project_id == 0) {
+        snprintf(window_title, sizeof(window_title), "Inbox");
+    } else {
+        // Find project name
+        const char* project_name = "Unknown";
+        for (int i = 0; i < project_count; i++) {
+            if (projects[i].id == selected_project_id) {
+                project_name = projects[i].title;
+                break;
+            }
+        }
+        snprintf(window_title, sizeof(window_title), "Project: %s", project_name);
+    }
+    igBegin(window_title, NULL, 0);
     
     // Input field for new tasks
     igText("Add new task (Ctrl+N):");
@@ -237,6 +252,49 @@ void inbox_view_render(Task* tasks, int task_count, int* needs_reload) {
                     if (editing_task_id == task->id) {
                         editing_task_id = -1;
                     }
+                }
+            }
+            
+            // Project assignment (only show if not editing)
+            if (editing_task_id != task->id && project_count > 0) {
+                igSameLine(0, 10);
+                igText("→");
+                igSameLine(0, 5);
+                
+                // Show current project or "None"
+                const char* current_project = "None";
+                if (task->project_id > 0) {
+                    for (int j = 0; j < project_count; j++) {
+                        if (projects[j].id == task->project_id) {
+                            current_project = projects[j].title;
+                            break;
+                        }
+                    }
+                }
+                
+                char combo_label[300];
+                snprintf(combo_label, sizeof(combo_label), "%s##project_%d", current_project, task->id);
+                
+                if (igBeginCombo(combo_label, current_project, 0)) {
+                    // "None" option (unassign)
+                    bool is_selected = (task->project_id == 0);
+                    if (igSelectable_Bool("None", is_selected, 0, (ImVec2){0, 0})) {
+                        if (db_assign_task_to_project(task->id, 0) == 0) {
+                            *needs_reload = 1;
+                        }
+                    }
+                    
+                    // All projects
+                    for (int j = 0; j < project_count; j++) {
+                        is_selected = (task->project_id == projects[j].id);
+                        if (igSelectable_Bool(projects[j].title, is_selected, 0, (ImVec2){0, 0})) {
+                            if (db_assign_task_to_project(task->id, projects[j].id) == 0) {
+                                *needs_reload = 1;
+                            }
+                        }
+                    }
+                    
+                    igEndCombo();
                 }
             }
             

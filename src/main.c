@@ -10,8 +10,10 @@
 
 #include "core/platform.h"
 #include "core/task.h"
+#include "core/project.h"
 #include "db/database.h"
 #include "ui/inbox_view.h"
+#include "ui/sidebar.h"
 
 // Forward declarations
 static void glfw_error_callback(int error, const char* description);
@@ -21,18 +23,60 @@ static void cleanup_imgui(void);
 // Application state
 static Task* tasks = NULL;
 static int task_count = 0;
+static Project* projects = NULL;
+static int project_count = 0;
+static int selected_project_id = 0;  // 0 = Inbox
 
-// Load tasks from database
-static int load_tasks(void) {
+// Load tasks from database (optionally filtered by project)
+static int load_tasks(int project_filter) {
     if (tasks != NULL) {
         free(tasks);
         tasks = NULL;
         task_count = 0;
     }
     
-    // Load inbox tasks
-    if (db_load_tasks(&tasks, &task_count, TASK_STATUS_INBOX) != 0) {
+    // Load all incomplete tasks, we'll filter by project in the UI if needed
+    if (db_load_tasks(&tasks, &task_count, -1) != 0) {
         fprintf(stderr, "Failed to load tasks: %s\n", db_get_error());
+        return -1;
+    }
+    
+    // If filtering by project or inbox, keep only matching tasks
+    if (project_filter >= 0) {
+        int filtered_count = 0;
+        for (int i = 0; i < task_count; i++) {
+            if (project_filter == 0) {
+                // Inbox: tasks with no project
+                if (tasks[i].project_id == 0 && tasks[i].status != TASK_STATUS_DONE) {
+                    tasks[filtered_count++] = tasks[i];
+                }
+            } else {
+                // Specific project: tasks assigned to this project
+                if (tasks[i].project_id == project_filter && tasks[i].status != TASK_STATUS_DONE) {
+                    // For sequential projects, only show first incomplete task
+                    int first_task = db_get_first_incomplete_task_in_project(project_filter);
+                    if (first_task == tasks[i].id) {
+                        tasks[filtered_count++] = tasks[i];
+                    }
+                }
+            }
+        }
+        task_count = filtered_count;
+    }
+    
+    return 0;
+}
+
+// Load projects from database
+static int load_projects(void) {
+    if (projects != NULL) {
+        free(projects);
+        projects = NULL;
+        project_count = 0;
+    }
+    
+    if (db_load_projects(&projects, &project_count) != 0) {
+        fprintf(stderr, "Failed to load projects: %s\n", db_get_error());
         return -1;
     }
     
@@ -72,13 +116,18 @@ int main(int argc, char** argv) {
     
     printf("Database initialized successfully\n");
     
-    // Load tasks
-    if (load_tasks() != 0) {
+    // Load projects and tasks
+    if (load_projects() != 0) {
         db_close();
         return 1;
     }
     
-    printf("Loaded %d tasks\n", task_count);
+    if (load_tasks(selected_project_id) != 0) {
+        db_close();
+        return 1;
+    }
+    
+    printf("Loaded %d projects and %d tasks\n", project_count, task_count);
     
     // Setup GLFW
     glfwSetErrorCallback(glfw_error_callback);
@@ -120,7 +169,8 @@ int main(int argc, char** argv) {
     
     printf("ImGui initialized successfully\n");
     
-    // Initialize inbox view
+    // Initialize views
+    sidebar_init();
     inbox_view_init();
     
     printf("Entering main loop...\n");
@@ -134,13 +184,27 @@ int main(int argc, char** argv) {
         ImGui_ImplGlfw_NewFrame();
         igNewFrame();
         
-        // Render UI
-        int needs_reload = 0;
-        inbox_view_render(tasks, task_count, &needs_reload);
+        // Render sidebar
+        int sidebar_needs_reload = 0;
+        int prev_project = selected_project_id;
+        sidebar_render(projects, project_count, &selected_project_id, &sidebar_needs_reload);
         
-        // Reload tasks if needed
-        if (needs_reload) {
-            load_tasks();
+        // If project changed, reload tasks
+        if (prev_project != selected_project_id) {
+            load_tasks(selected_project_id);
+        }
+        
+        // Render inbox/project view
+        int inbox_needs_reload = 0;
+        inbox_view_render(tasks, task_count, projects, project_count, 
+                         selected_project_id, &inbox_needs_reload);
+        
+        // Reload if needed
+        if (sidebar_needs_reload) {
+            load_projects();
+        }
+        if (inbox_needs_reload) {
+            load_tasks(selected_project_id);
         }
         
         // Rendering
@@ -160,10 +224,15 @@ int main(int argc, char** argv) {
     printf("Shutting down...\n");
     
     // Cleanup
+    sidebar_cleanup();
     inbox_view_cleanup();
     
     if (tasks != NULL) {
         free(tasks);
+    }
+    
+    if (projects != NULL) {
+        free(projects);
     }
     
     cleanup_imgui();

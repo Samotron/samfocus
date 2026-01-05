@@ -2,6 +2,7 @@
 #define DATABASE_H
 
 #include "../core/task.h"
+#include "../core/project.h"
 
 /**
  * Initialize the database connection.
@@ -67,5 +68,55 @@ int db_delete_task(int id);
  * Get the last error message from the database.
  */
 const char* db_get_error(void);
+
+// ============================================================================
+// Project operations
+// ============================================================================
+
+/**
+ * Insert a new project.
+ * 
+ * Returns the new project ID on success, -1 on error.
+ */
+int db_insert_project(const char* title, ProjectType type);
+
+/**
+ * Load all projects.
+ * 
+ * @param projects Output pointer to array of projects (caller must free)
+ * @param count Output pointer to number of projects loaded
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_load_projects(Project** projects, int* count);
+
+/**
+ * Update a project's title.
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_update_project_title(int id, const char* title);
+
+/**
+ * Delete a project by ID.
+ * Note: Tasks in this project will have their project_id set to NULL.
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_delete_project(int id);
+
+/**
+ * Assign a task to a project.
+ * 
+ * Returns 0 on success, -1 on error.
+ */
+int db_assign_task_to_project(int task_id, int project_id);
+
+/**
+ * Get the first incomplete task in a sequential project.
+ * 
+ * Returns task ID on success, -1 if no incomplete tasks, -2 on error.
+ */
+int db_get_first_incomplete_task_in_project(int project_id);
 
 #endif // DATABASE_H

@@ -2,8 +2,12 @@
 
 A personal OmniFocus-style task management application built with C, Dear ImGui, and SQLite.
 
-## Features (Phase 0-2 Complete)
+## Features (Phase 0-3 Complete)
 
+- **Project Management**: Organize tasks into sequential projects
+- **Sidebar Navigation**: Quick access to Inbox and all projects
+- **Sequential Projects**: Automatically show only the next available action
+- **Task Assignment**: Easily move tasks between projects via dropdown
 - **Inbox view**: Capture tasks quickly with zero friction
 - **Full keyboard navigation**: Mouse optional for all operations
 - **Arrow key navigation**: Move through tasks with Up/Down
@@ -119,6 +123,21 @@ meson compile -C build && ./build/samfocus
 - **Right-click task**: Select task (without editing)
 - **Checkbox**: Toggle completion status
 - **Delete button**: Remove task
+- **Project dropdown**: Assign task to a project or move to Inbox
+
+**Projects:**
+- **Click "Inbox"**: View all unassigned tasks
+- **Click project name**: View tasks in that project (sequential projects show only next action)
+- **Click "+"**: Create a new project
+- **Right-click project**: Rename or delete
+- **→ symbol**: Sequential project (shows only next action)
+
+### GTD Workflow
+
+1. **Capture**: Press Ctrl+N anywhere and type a task
+2. **Organize**: Use the project dropdown to assign tasks
+3. **Review**: Click through projects in the sidebar
+4. **Do**: Sequential projects automatically show only the next action
 
 ## Data Location
 
@@ -135,11 +154,13 @@ samfocus/
 │   ├── main.c              # Application entry point
 │   ├── core/
 │   │   ├── platform.c/h    # Platform-specific utilities
-│   │   └── task.c/h        # Task data structures
+│   │   ├── task.c/h        # Task data structures
+│   │   └── project.c/h     # Project data structures
 │   ├── db/
 │   │   └── database.c/h    # SQLite database layer
 │   └── ui/
-│       └── inbox_view.c/h  # Inbox UI
+│       ├── inbox_view.c/h  # Task list UI
+│       └── sidebar.c/h     # Project sidebar UI
 ├── external/
 │   └── cimgui/             # Dear ImGui C bindings (submodule)
 └── meson.build             # Build configuration
@@ -152,7 +173,7 @@ This project follows an 8-phase development plan:
 - [x] **Phase 0**: Ground rules & setup
 - [x] **Phase 1**: Skeleton & persistence
 - [x] **Phase 2**: Inbox + keyboard flow
-- [ ] **Phase 3**: Projects
+- [x] **Phase 3**: Projects (Sequential only)
 - [ ] **Phase 4**: Defer & due dates
 - [ ] **Phase 5**: Tags/contexts
 - [ ] **Phase 6**: Review mode
