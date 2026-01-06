@@ -119,12 +119,13 @@ cli_sources = files(
   'src/core/task.c',
   'src/core/project.c',
   'src/core/context.c',
+  'src/core/platform.c',
 )
 
 executable('samfocus-cli',
   cli_sources,
   include_directories: src_inc,
-  dependencies: [sqlite_dep],
+  dependencies: [sqlite_dep] + platform_deps,
   c_args: platform_args,
   install: true
 )
