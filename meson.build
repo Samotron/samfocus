@@ -14,8 +14,9 @@ host_system = host_machine.system()
 is_windows = host_system == 'windows'
 is_linux = host_system == 'linux'
 
-# Dependencies - prefer static libraries
-# Note: static parameter works best with pkg-config based dependencies
+# Dependencies
+# On Windows with MinGW/GCC, the -static linker flag will prefer static versions
+# of these dependencies when available, avoiding missing DLL issues
 glfw_dep = dependency('glfw3', required: false)
 if not glfw_dep.found()
   # Fall back to system package or fail with helpful message
@@ -110,7 +111,7 @@ link_args = []
 if is_windows
   # Get the compiler to determine the correct flags
   cc = meson.get_compiler('c')
-  
+
   # For MinGW/GCC on Windows, use these flags for static linking
   if cc.get_id() == 'gcc'
     # Fully static linking to avoid missing DLL issues on Windows
