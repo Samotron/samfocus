@@ -1,6 +1,7 @@
 // samfocus-cli.c - Command-line companion tool for SamFocus
 // Allows quick task management from the terminal
 
+#include "../core/platform.h"
 #include "../db/database.h"
 #include "../core/task.h"
 #include "../core/project.h"
@@ -9,27 +10,27 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
-#include <sys/stat.h>
 #include <stdbool.h>
 
 #define VERSION "1.0.0"
 
 // Helper to get database path (same as main app)
 static char* get_db_path(void) {
-    const char* home = getenv("HOME");
-    if (!home) {
-        fprintf(stderr, "Error: HOME environment variable not set\n");
+    const char* data_dir = get_app_data_dir();
+    if (!data_dir) {
+        fprintf(stderr, "Error: Could not determine application data directory\n");
+        return NULL;
+    }
+    
+    // Ensure directory exists
+    if (ensure_dir_exists(data_dir) != 0) {
+        fprintf(stderr, "Error: Could not create directory: %s\n", data_dir);
         return NULL;
     }
     
     static char db_path[512];
-    snprintf(db_path, sizeof(db_path), "%s/.local/share/samfocus/tasks.db", home);
-    
-    // Ensure directory exists
-    char dir_path[512];
-    snprintf(dir_path, sizeof(dir_path), "%s/.local/share/samfocus", home);
-    mkdir(dir_path, 0755);
+    const char* joined = path_join(data_dir, "tasks.db");
+    snprintf(db_path, sizeof(db_path), "%s", joined);
     
     return db_path;
 }
