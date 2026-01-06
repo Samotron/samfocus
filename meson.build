@@ -4,7 +4,8 @@ project('samfocus', 'c', 'cpp',
     'c_std=c11',
     'cpp_std=c++11',
     'warning_level=2',
-    'buildtype=debug'
+    'buildtype=debug',
+    'default_library=static'
   ]
 )
 
@@ -14,6 +15,8 @@ is_windows = host_system == 'windows'
 is_linux = host_system == 'linux'
 
 # Dependencies
+# On Windows with MinGW/GCC, the -static linker flag will prefer static versions
+# of these dependencies when available, avoiding missing DLL issues
 glfw_dep = dependency('glfw3', required: false)
 if not glfw_dep.found()
   # Fall back to system package or fail with helpful message
@@ -103,12 +106,29 @@ elif is_windows
   platform_args += ['-DPLATFORM_WINDOWS', '-D_CRT_SECURE_NO_WARNINGS']
 endif
 
+# Platform-specific linker args for static linking
+link_args = []
+if is_windows
+  # Get the compiler to determine the correct flags
+  cc = meson.get_compiler('c')
+
+  # For MinGW/GCC on Windows, use these flags for static linking
+  if cc.get_id() == 'gcc'
+    # Fully static linking to avoid missing DLL issues on Windows
+    # This links all libraries statically, including standard libraries
+    link_args += ['-static']
+  endif
+  # Note: For MSVC, static linking is controlled via /MT flag in c_args
+  # and by using static library (.lib) files instead of import libraries
+endif
+
 # Main executable
 executable('samfocus',
   app_sources,
   include_directories: src_inc,
   dependencies: [cimgui_dep, sqlite_dep] + platform_deps,
   c_args: platform_args,
+  link_args: link_args,
   install: true
 )
 
@@ -127,6 +147,7 @@ executable('samfocus-cli',
   include_directories: src_inc,
   dependencies: [sqlite_dep] + platform_deps,
   c_args: platform_args,
+  link_args: link_args,
   install: true
 )
 
