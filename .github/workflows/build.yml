@@ -50,24 +50,25 @@ jobs:
         with:
           submodules: recursive
       
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
         with:
-          python-version: '3.x'
-      
-      - name: Install Meson
-        run: pip install meson ninja
-      
-      - name: Setup MSVC
-        uses: microsoft/setup-msbuild@v2
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-meson
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-glfw
+            mingw-w64-x86_64-sqlite3
+            mingw-w64-x86_64-pkg-config
       
       - name: Configure
-        shell: cmd
-        run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          meson setup build
+        shell: msys2 {0}
+        run: meson setup build
       
       - name: Build
+        shell: msys2 {0}
         run: meson compile -C build
       
       - name: Upload Windows artifact

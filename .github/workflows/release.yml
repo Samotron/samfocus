@@ -1,0 +1,133 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            meson \
+            ninja-build \
+            libglfw3-dev \
+            libsqlite3-dev \
+            libgl1-mesa-dev \
+            pkg-config \
+            gcc \
+            g++
+      
+      - name: Configure
+        run: meson setup build --buildtype=release
+      
+      - name: Build
+        run: meson compile -C build
+      
+      - name: Package Linux binary
+        run: |
+          mkdir -p artifacts/samfocus-linux
+          cp build/samfocus artifacts/samfocus-linux/
+          cp build/samfocus-cli artifacts/samfocus-linux/
+          cp README.md artifacts/samfocus-linux/
+          cp LICENSE artifacts/samfocus-linux/ 2>/dev/null || true
+          cd artifacts
+          tar -czf samfocus-linux-x86_64.tar.gz samfocus-linux/
+      
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: samfocus-linux-x86_64
+          path: artifacts/samfocus-linux-x86_64.tar.gz
+  
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-meson
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-glfw
+            mingw-w64-x86_64-sqlite3
+            mingw-w64-x86_64-pkg-config
+            zip
+      
+      - name: Configure
+        shell: msys2 {0}
+        run: meson setup build --buildtype=release
+      
+      - name: Build
+        shell: msys2 {0}
+        run: meson compile -C build
+      
+      - name: Package Windows binary
+        shell: msys2 {0}
+        run: |
+          mkdir -p artifacts/samfocus-windows
+          cp build/samfocus.exe artifacts/samfocus-windows/
+          cp build/samfocus-cli.exe artifacts/samfocus-windows/
+          cp README.md artifacts/samfocus-windows/
+          cp LICENSE artifacts/samfocus-windows/ 2>/dev/null || true
+          cd artifacts
+          zip -r samfocus-windows-x86_64.zip samfocus-windows/
+      
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: samfocus-windows-x86_64
+          path: artifacts/samfocus-windows-x86_64.zip
+  
+  create-release:
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: samfocus-linux-x86_64
+          path: artifacts/
+      
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: samfocus-windows-x86_64
+          path: artifacts/
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/samfocus-linux-x86_64.tar.gz
+            artifacts/samfocus-windows-x86_64.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
