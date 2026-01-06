@@ -1,10 +1,17 @@
 #include "export.h"
+#include "platform.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <sys/stat.h>
-#include <unistd.h>
+
+#ifdef PLATFORM_WINDOWS
+    #include <io.h>
+    #define F_OK 0
+    #define access _access
+#else
+    #include <unistd.h>
+#endif
 
 static char error_msg[512] = {0};
 
@@ -18,13 +25,22 @@ const char* export_get_error(void) {
 
 const char* export_get_default_dir(void) {
     static char export_dir[512];
-    const char* home = getenv("HOME");
-    if (!home) {
-        return "/tmp";
-    }
     
-    snprintf(export_dir, sizeof(export_dir), "%s/.local/share/samfocus/exports", home);
-    mkdir(export_dir, 0755);
+    // Get the base app data directory
+    const char* app_dir = get_app_data_dir();
+    
+    // Create exports subdirectory path
+    snprintf(export_dir, sizeof(export_dir), "%s%cexports", app_dir,
+#ifdef PLATFORM_WINDOWS
+        '\\'
+#else
+        '/'
+#endif
+    );
+    
+    // Ensure the directory exists
+    ensure_dir_exists(app_dir);
+    ensure_dir_exists(export_dir);
     
     return export_dir;
 }
