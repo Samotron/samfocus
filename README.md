@@ -98,8 +98,10 @@ sudo pacman -S \
 
 1. Install [Python](https://www.python.org/downloads/) (for meson)
 2. Install meson: `pip install meson ninja`
-3. Install [Visual Studio](https://visualstudio.microsoft.com/) with C++ tools
+3. Install [Visual Studio](https://visualstudio.microsoft.com/) with C++ tools or [MSYS2](https://www.msys2.org/) with MinGW-w64
 4. Dependencies (GLFW, SQLite) will be handled by meson automatically
+
+**Note:** The Windows build uses static linking by default to create standalone executables that don't require external DLLs. This ensures the application runs on any Windows system without dependency issues.
 
 ### Build Instructions
 
@@ -118,8 +120,21 @@ meson setup build
 meson compile -C build
 
 # Run
-./build/samfocus
+./build/samfocus  # On Linux/Mac
+# or
+build\samfocus.exe  # On Windows
 ```
+
+### Static Linking (Windows)
+
+On Windows, the build system automatically creates statically-linked executables to avoid DLL dependency issues. This means:
+
+- The executable includes all required libraries
+- No external DLLs are needed (except system DLLs like kernel32.dll)
+- The application runs on any Windows system without installing dependencies
+- The executable size is larger but more portable
+
+On Linux, dynamic linking is used by default as it's the standard practice and integrates better with system libraries.
 
 ### Development Build
 
