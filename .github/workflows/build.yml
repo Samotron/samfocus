@@ -16,30 +16,28 @@ jobs:
         with:
           submodules: recursive
       
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.0
+      
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            meson \
-            ninja-build \
             libglfw3-dev \
             libsqlite3-dev \
             libgl1-mesa-dev \
-            pkg-config \
-            gcc \
-            g++
-      
-      - name: Configure
-        run: meson setup build
+            pkg-config
       
       - name: Build
-        run: meson compile -C build
+        run: zig build
       
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
           name: samfocus-linux
-          path: build/samfocus
+          path: zig-out/bin/samfocus
   
   build-windows:
     runs-on: windows-latest
@@ -50,6 +48,11 @@ jobs:
         with:
           submodules: recursive
       
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.14.0
+      
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
@@ -57,22 +60,16 @@ jobs:
           update: true
           install: >-
             mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-meson
-            mingw-w64-x86_64-ninja
             mingw-w64-x86_64-glfw
             mingw-w64-x86_64-sqlite3
             mingw-w64-x86_64-pkg-config
       
-      - name: Configure
-        shell: msys2 {0}
-        run: meson setup build
-      
       - name: Build
         shell: msys2 {0}
-        run: meson compile -C build
+        run: zig build
       
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: samfocus-windows
-          path: build/samfocus.exe
+          path: zig-out/bin/samfocus.exe

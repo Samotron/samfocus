@@ -17,33 +17,30 @@ jobs:
       with:
         submodules: recursive
     
+    - name: Setup Zig
+      uses: goto-bus-stop/setup-zig@v2
+      with:
+        version: 0.14.0
+    
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          meson \
-          ninja-build \
           libglfw3-dev \
           libgl1-mesa-dev \
           libsqlite3-dev \
           libx11-dev \
           pkg-config
     
-    - name: Setup build
-      run: meson setup build
-    
-    - name: Compile
-      run: meson compile -C build
-    
-    - name: Run tests
-      run: meson test -C build -v
+    - name: Build and test
+      run: zig build test
     
     - name: Upload test logs on failure
       if: failure()
       uses: actions/upload-artifact@v4
       with:
         name: test-logs-linux
-        path: build/meson-logs/testlog.txt
+        path: zig-out/
 
   build-windows:
     name: Build on Windows
@@ -55,6 +52,11 @@ jobs:
       with:
         submodules: recursive
     
+    - name: Setup Zig
+      uses: goto-bus-stop/setup-zig@v2
+      with:
+        version: 0.14.0
+    
     - name: Setup MSYS2
       uses: msys2/setup-msys2@v2
       with:
@@ -62,28 +64,20 @@ jobs:
         update: true
         install: >-
           mingw-w64-x86_64-gcc
-          mingw-w64-x86_64-meson
-          mingw-w64-x86_64-ninja
           mingw-w64-x86_64-glfw
           mingw-w64-x86_64-sqlite3
           mingw-w64-x86_64-pkg-config
     
-    - name: Build
+    - name: Build and test
       shell: msys2 {0}
-      run: |
-        meson setup build
-        meson compile -C build
-    
-    - name: Run tests
-      shell: msys2 {0}
-      run: meson test -C build -v
+      run: zig build test
     
     - name: Upload test logs on failure
       if: failure()
       uses: actions/upload-artifact@v4
       with:
         name: test-logs-windows
-        path: build/meson-logs/testlog.txt
+        path: zig-out/
 
   code-quality:
     name: Code Quality Checks
