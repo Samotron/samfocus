@@ -50,56 +50,48 @@ A fully-featured, cross-platform GTD task management application built with C, D
 
 ## Building
 
+### Prerequisites
+
+**Zig 0.14.0 or later** - [Download Zig](https://ziglang.org/download/)
+
 ### Dependencies
+
+Zig automatically handles cross-compilation and dependency management. System dependencies are only needed for the target platform:
 
 #### Linux (Ubuntu/Debian)
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y \
-    meson \
-    ninja-build \
     libglfw3-dev \
     libsqlite3-dev \
     libgl1-mesa-dev \
-    pkg-config \
-    gcc \
-    g++
+    pkg-config
 ```
 
 #### Linux (Fedora/RHEL)
 
 ```bash
 sudo dnf install -y \
-    meson \
-    ninja-build \
     glfw-devel \
     sqlite-devel \
     mesa-libGL-devel \
-    pkg-config \
-    gcc \
-    gcc-c++
+    pkg-config
 ```
 
 #### Linux (Arch)
 
 ```bash
 sudo pacman -S \
-    meson \
-    ninja \
     glfw \
     sqlite \
     mesa \
-    pkg-config \
-    gcc
+    pkg-config
 ```
 
 #### Windows
 
-1. Install [Python](https://www.python.org/downloads/) (for meson)
-2. Install meson: `pip install meson ninja`
-3. Install [Visual Studio](https://visualstudio.microsoft.com/) with C++ tools or [MSYS2](https://www.msys2.org/) with MinGW-w64
-4. Dependencies (GLFW, SQLite) will be handled by meson automatically
+No additional dependencies needed! Zig handles cross-compilation from any platform.
 
 **Note:** The Windows build uses static linking by default to create standalone executables that don't require external DLLs. This ensures the application runs on any Windows system without dependency issues.
 
@@ -113,19 +105,31 @@ cd samfocus
 # Initialize submodules
 git submodule update --init --recursive
 
-# Configure the build
-meson setup build
-
-# Compile
-meson compile -C build
+# Build (single command!)
+zig build
 
 # Run
-./build/samfocus  # On Linux/Mac
+./zig-out/bin/samfocus  # On Linux/Mac
 # or
-build\samfocus.exe  # On Windows
+zig-out\bin\samfocus.exe  # On Windows
 ```
 
-### Static Linking (Windows)
+### Cross-Compilation
+
+Zig makes cross-compilation trivial:
+
+```bash
+# Build for Windows from Linux/Mac
+zig build -Dtarget=x86_64-windows-gnu
+
+# Build for Linux from any platform
+zig build -Dtarget=x86_64-linux-gnu
+
+# List all available targets
+zig targets
+```
+
+### Static Linking
 
 On Windows, the build system automatically creates statically-linked executables to avoid DLL dependency issues. This means:
 
@@ -141,8 +145,9 @@ On Linux, dynamic linking is used by default as it's the standard practice and i
 For faster iteration during development:
 
 ```bash
-meson setup build --buildtype=debug
-meson compile -C build && ./build/samfocus
+zig build                           # Default is debug mode
+./zig-out/bin/samfocus              # Run GUI app
+./zig-out/bin/samfocus-cli --help   # Run CLI tool
 ```
 
 ## Usage
@@ -246,7 +251,8 @@ samfocus/
 │   └── cimgui/                     # Dear ImGui C bindings (submodule)
 ├── .github/workflows/
 │   └── ci.yml                      # GitHub Actions CI/CD
-├── meson.build                     # Build configuration
+├── build.zig                       # Zig build configuration
+├── build.zig.zon                   # Zig package manifest
 ├── README.md                       # This file
 ├── TESTING.md                      # Testing documentation
 ├── LAUNCHER.md                     # Launcher usage guide
@@ -258,9 +264,9 @@ samfocus/
 Run all tests with:
 
 ```bash
-./run_tests.sh          # Clean output
-./run_tests.sh -v       # Verbose output
-meson test -C build -v  # Direct meson call
+zig build test              # Run all tests with clean output
+zig build test-db           # Run only database unit tests
+zig build test-workflows    # Run only integration tests
 ```
 
 **Test Coverage:**

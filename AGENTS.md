@@ -4,47 +4,43 @@ This guide is for agentic coding assistants working in the SamFocus codebase. Sa
 
 ## Build System
 
-**Build tool:** Meson + Ninja  
+**Build tool:** Zig (0.14.0+)  
 **C Standard:** C11  
 **C++ Standard:** C++11 (for Dear ImGui only)
 
 ### Common Commands
 
 ```bash
-# Initial setup
-meson setup build
-
-# Compile application
-meson compile -C build
+# Build everything (GUI app, CLI tool, tests)
+zig build
 
 # Run application
-./build/samfocus
+./zig-out/bin/samfocus
 
 # Run CLI tool
-./build/samfocus-cli help
+./zig-out/bin/samfocus-cli help
 
 # Clean and rebuild
-rm -rf build
-meson setup build
-meson compile -C build
+rm -rf zig-out .zig-cache
+zig build
+
+# Cross-compile for Windows (from any platform)
+zig build -Dtarget=x86_64-windows-gnu
 ```
 
 ### Testing
 
 ```bash
 # Run all tests (clean output)
-./run_tests.sh
+zig build test
 
-# Run all tests (verbose)
-./run_tests.sh -v
+# Run specific test executables
+zig build test-db         # Unit tests only
+zig build test-workflows  # Integration tests only
 
-# Run tests directly with meson
-meson test -C build
-meson test -C build -v
-
-# Run single test executable
-./build/test_database      # Unit tests only
-./build/test_workflows     # Integration tests only
+# Run test executables directly
+./zig-out/bin/test_database   # Unit tests
+./zig-out/bin/test_workflows  # Integration tests
 ```
 
 **Test framework:** Custom framework in `tests/test_framework.h`  
@@ -226,7 +222,7 @@ Use preprocessor directives for platform differences:
 #endif
 ```
 
-Platform macros are defined in `meson.build` via `-DPLATFORM_LINUX` or `-DPLATFORM_WINDOWS`.
+Platform macros are defined in `build.zig` via `-DPLATFORM_LINUX` or `-DPLATFORM_WINDOWS`.
 
 ## Important Notes
 
@@ -243,11 +239,11 @@ Platform macros are defined in `meson.build` via `-DPLATFORM_LINUX` or `-DPLATFO
 
 1. Create header file in appropriate directory (`src/core/`, `src/ui/`, etc.)
 2. Implement in corresponding `.c` file
-3. Add files to `app_sources` in `meson.build`
+3. Add files to `app_sources` in `build.zig`
 4. Include header in `main.c` if needed
 5. Add keyboard shortcuts to `help_overlay.c`
 6. Write unit tests in `tests/unit/` and/or integration tests in `tests/integration/`
-7. Run `./run_tests.sh` to verify all tests pass
+7. Run `zig build test` to verify all tests pass
 8. Update documentation (README.md, LAUNCHER.md, etc.)
 9. Commit with descriptive message following project convention
 

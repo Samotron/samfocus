@@ -14,33 +14,29 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Check if build directory exists
-if [ ! -d "build" ]; then
-    echo -e "${YELLOW}Build directory not found. Running initial setup...${NC}"
-    meson setup build
-fi
-
-# Compile tests
-echo -e "${YELLOW}Compiling tests...${NC}"
-meson compile -C build
-
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Compilation failed!${NC}"
+# Check if zig is installed
+if ! command -v zig &> /dev/null; then
+    echo -e "${RED}Zig is not installed or not in PATH${NC}"
+    echo "Please install Zig 0.14.0 or later from https://ziglang.org/download/"
     exit 1
 fi
 
-echo ""
-echo -e "${GREEN}Compilation successful!${NC}"
-echo ""
-
-# Run tests
-echo -e "${YELLOW}Running tests...${NC}"
+# Build and run tests
+echo -e "${YELLOW}Building and running tests...${NC}"
 echo ""
 
 if [ "$1" == "-v" ] || [ "$1" == "--verbose" ]; then
-    meson test -C build -v
+    # Run test executables directly for verbose output
+    zig build
+    echo ""
+    echo "Running unit tests..."
+    ./zig-out/bin/test_database
+    echo ""
+    echo "Running integration tests..."
+    ./zig-out/bin/test_workflows
 else
-    meson test -C build
+    # Use zig build test for clean output
+    zig build test
 fi
 
 TEST_RESULT=$?

@@ -1,6 +1,8 @@
 # Build directories
 build/
 builddir/
+zig-out/
+.zig-cache/
 
 # Meson subprojects (downloaded dependencies)
 subprojects/packagecache/
