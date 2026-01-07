@@ -15,14 +15,20 @@ is_windows = host_system == 'windows'
 is_linux = host_system == 'linux'
 
 # Dependencies
-# On Windows with MinGW/GCC, the -static linker flag will prefer static versions
-# of these dependencies when available, avoiding missing DLL issues
-glfw_dep = dependency('glfw3', required: false)
-if not glfw_dep.found()
-  # Fall back to system package or fail with helpful message
-  glfw_dep = dependency('glfw3', 
-    required: true,
-    fallback: ['glfw', 'glfw_dep'])
+# On Windows with MinGW/GCC, force static linking to avoid missing DLL issues
+# We use static: true to tell pkg-config to return static library flags
+if is_windows
+  glfw_dep = dependency('glfw3', required: true, static: true)
+  sqlite_dep = dependency('sqlite3', required: true, static: true)
+else
+  glfw_dep = dependency('glfw3', required: false)
+  if not glfw_dep.found()
+    # Fall back to system package or fail with helpful message
+    glfw_dep = dependency('glfw3', 
+      required: true,
+      fallback: ['glfw', 'glfw_dep'])
+  endif
+  sqlite_dep = dependency('sqlite3', required: true)
 endif
 
 gl_dep = dependency('gl', required: false)
@@ -34,8 +40,6 @@ if not gl_dep.found()
     gl_dep = dependency('gl', required: true)
   endif
 endif
-
-sqlite_dep = dependency('sqlite3', required: true)
 
 # Platform-specific dependencies
 platform_deps = []
@@ -115,8 +119,9 @@ if is_windows
   # For MinGW/GCC on Windows, use these flags for static linking
   if cc.get_id() == 'gcc'
     # Fully static linking to avoid missing DLL issues on Windows
-    # This links all libraries statically, including standard libraries
-    link_args += ['-static']
+    # -static links all libraries statically, including standard libraries
+    # -static-libgcc ensures static linking of GCC runtime
+    link_args += ['-static', '-static-libgcc']
   endif
   # Note: For MSVC, static linking is controlled via /MT flag in c_args
   # and by using static library (.lib) files instead of import libraries
