@@ -65,7 +65,9 @@ jobs:
       
       - name: Configure
         shell: msys2 {0}
-        run: meson setup build
+        run: |
+          export PKG_CONFIG="pkg-config --static"
+          meson setup build
       
       - name: Build
         shell: msys2 {0}
